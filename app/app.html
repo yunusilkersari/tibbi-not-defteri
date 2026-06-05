@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tıbbi Not Defteri</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- ====== SIDEBAR ====== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <!-- Logo -->
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <span class="sidebar-logo-icon">🩺</span>
+            <span class="sidebar-logo-text">Tıbbi Not Defteri</span>
+          </div>
+          <button class="sidebar-toggle" id="sidebarToggle" title="Kenar çubuğunu kapat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Quick Note -->
+        <div class="sidebar-section">
+          <button class="sidebar-new-note-btn" id="newNoteBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Yeni Not
+          </button>
+        </div>
+
+        <!-- Calendar -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>📅 Takvim</span>
+          </div>
+          <div class="calendar" id="calendar">
+            <div class="calendar-header">
+              <button class="calendar-nav" id="calPrev">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="calendar-month" id="calMonth"></span>
+              <button class="calendar-nav" id="calNext">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>Pt</span><span>Sa</span><span>Ça</span><span>Pe</span><span>Cu</span><span>Ct</span><span>Pz</span>
+            </div>
+            <div class="calendar-days" id="calDays"></div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🔍 Ara</span>
+          </div>
+          <div class="search-box">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara...">
+            <button class="search-clear" id="searchClear" style="display:none">✕</button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🏷️ Filtreler</span>
+          </div>
+          <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all">
+              <span class="filter-icon">📋</span> Tüm Notlar
+            </button>
+            <button class="filter-btn" data-filter="starred">
+              <span class="filter-icon">⭐</span> Yıldızlı
+            </button>
+            <button class="filter-btn" data-filter="today">
+              <span class="filter-icon">📆</span> Bugün
+            </button>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🔖 Etiketler</span>
+          </div>
+          <div class="tag-cloud" id="tagCloud">
+            <div class="tag-empty">Henüz etiket yok</div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="sidebar-section sidebar-stats">
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Toplam Not</span>
+            <span class="sidebar-stat-value" id="statTotal">0</span>
+          </div>
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Bugün</span>
+            <span class="sidebar-stat-value" id="statToday">0</span>
+          </div>
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Yıldızlı</span>
+            <span class="sidebar-stat-value" id="statStarred">0</span>
+          </div>
+        </div>
+
+        <!-- Data Actions -->
+        <div class="sidebar-section sidebar-data-actions">
+          <button class="data-action-btn" id="exportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            JSON Dışa Aktar
+          </button>
+          <button class="data-action-btn" id="importBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            JSON İçe Aktar
+          </button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content" id="mainContent">
+      <!-- Top Bar -->
+      <div class="topbar">
+        <button class="topbar-menu-btn" id="menuToggle" title="Menü">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+        <div class="topbar-title" id="topbarTitle">
+          <span class="topbar-date-day" id="topbarDay"></span>
+          <span class="topbar-date-full" id="topbarDate"></span>
+        </div>
+        <div class="topbar-actions">
+          <span class="topbar-note-count" id="topbarNoteCount">0 not</span>
+        </div>
+      </div>
+
+      <!-- Notes Container -->
+      <div class="notes-container" id="notesContainer">
+        <!-- Notes are rendered here dynamically -->
+        <div class="notes-empty" id="notesEmpty">
+          <div class="notes-empty-icon">📝</div>
+          <div class="notes-empty-title">Henüz not yok</div>
+          <div class="notes-empty-text">
+            Bir web sayfasında metin seçip <kbd>Alt+Q</kbd> basarak ilk notunuzu ekleyin,<br>
+            veya AI yanıtlarını <kbd>Alt+1</kbd> ile paragraflara bölün.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ====== MODALS ====== -->
+  <!-- Edit Note Modal -->
+  <div class="modal-overlay" id="editModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">📝 Notu Düzenle</h2>
+        <button class="modal-close" id="editModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">İçerik</label>
+          <textarea class="modal-textarea" id="editContent" rows="8"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Kişisel Not</label>
+          <textarea class="modal-textarea modal-textarea-sm" id="editUserNote" rows="3" placeholder="Kendi notlarınızı ekleyin..."></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Etiketler (virgülle ayırın)</label>
+          <input type="text" class="modal-input" id="editTags" placeholder="acil, kardiyoloji, nöroloji">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="editModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-primary" id="editModalSave">💾 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Note Modal -->
+  <div class="modal-overlay" id="newNoteModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">✏️ Yeni Not</h2>
+        <button class="modal-close" id="newNoteModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">İçerik</label>
+          <textarea class="modal-textarea" id="newNoteContent" rows="8" placeholder="Not içeriğinizi yazın..."></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Etiketler (virgülle ayırın)</label>
+          <input type="text" class="modal-input" id="newNoteTags" placeholder="acil, kardiyoloji, nöroloji">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="newNoteModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-primary" id="newNoteModalSave">📋 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="deleteModal" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">🗑️ Notu Sil</h2>
+        <button class="modal-close" id="deleteModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">Bu notu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="deleteModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-danger" id="deleteModalConfirm">🗑️ Sil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Read Note Modal -->
+  <div class="modal-overlay" id="readModal" style="display:none">
+    <div class="modal" style="width: min(720px, 90vw);">
+      <div class="modal-header">
+        <h2 class="modal-title">📖 Notu Oku</h2>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="read-modal-meta" id="readModalMeta"></span>
+          <button class="modal-close" id="readModalClose">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" style="max-height:60vh; overflow-y:auto;">
+        <div id="readModalContent" class="note-card-content" style="font-size:15px; line-height:1.85; color:var(--text-primary); word-break:break-word; max-height:none; overflow-y:auto;"></div>
+        <div id="readModalUserNote" style="display:none; margin-top:16px; padding:12px 16px; background:var(--accent-secondary-dim); border:1px solid rgba(108,99,255,0.12); border-radius:var(--radius-sm); font-size:14px; color:#b0adff; line-height:1.6; font-style:italic;"></div>
+        <div id="readModalSource" style="display:none; margin-top:16px; font-size:12px; color:var(--text-tertiary);"></div>
+        <div id="readModalTags" style="display:none; margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="readModalEditBtn">✏️ Düzenle</button>
+        <button class="modal-btn modal-btn-primary" id="readModalCloseBtn">Kapat</button>
+      </div>
+    </div>
+  </div>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

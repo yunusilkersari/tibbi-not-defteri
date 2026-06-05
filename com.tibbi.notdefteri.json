@@ -1,0 +1,7 @@
+{
+  "name": "com.tibbi.notdefteri",
+  "description": "Tıbbi Not Defteri - Yerel dosya kaydetme servisi",
+  "path": "c:\\Uygulamalarım\\Tıbbi Not Kayıt ve Düzenleme Sistemi\\native-host.bat",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://ponomjdikggkhbbehkmibcpncpmolnia/"]
+}

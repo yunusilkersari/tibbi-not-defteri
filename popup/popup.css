@@ -1,0 +1,302 @@
+/* ==========================================
+   Tıbbi Not Defteri - Popup Styles
+   ========================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 380px;
+  min-height: 200px;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  background: #0f1117;
+  color: #e4e4e7;
+  overflow-x: hidden;
+}
+
+/* ---- Container ---- */
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ---- Header ---- */
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  background: linear-gradient(180deg, rgba(0, 212, 170, 0.06), transparent);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.popup-logo-icon {
+  font-size: 22px;
+  filter: drop-shadow(0 0 8px rgba(0, 212, 170, 0.4));
+}
+
+.popup-logo-text {
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00d4aa, #6c63ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.3px;
+}
+
+.popup-date {
+  font-size: 12px;
+  color: rgba(228, 228, 231, 0.4);
+  font-weight: 500;
+}
+
+/* ---- Stats ---- */
+.popup-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.popup-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #00d4aa;
+  letter-spacing: -0.5px;
+}
+
+.popup-stat-label {
+  font-size: 11px;
+  color: rgba(228, 228, 231, 0.4);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.popup-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Quick Note ---- */
+.popup-quick-note {
+  padding: 12px 18px;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-quick-note textarea {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #e4e4e7;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.popup-quick-note textarea:focus {
+  border-color: rgba(0, 212, 170, 0.4);
+  background: rgba(0, 212, 170, 0.03);
+}
+
+.popup-quick-note textarea::placeholder {
+  color: rgba(228, 228, 231, 0.25);
+}
+
+.popup-quick-note-btn {
+  align-self: flex-end;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(0, 212, 170, 0.08));
+  border: 1px solid rgba(0, 212, 170, 0.25);
+  border-radius: 10px;
+  color: #00d4aa;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.popup-quick-note-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 170, 0.25), rgba(0, 212, 170, 0.15));
+  border-color: rgba(0, 212, 170, 0.5);
+  box-shadow: 0 0 20px rgba(0, 212, 170, 0.1);
+}
+
+/* ---- Section ---- */
+.popup-section {
+  padding: 10px 18px 8px;
+}
+
+.popup-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(228, 228, 231, 0.3);
+  margin-bottom: 8px;
+}
+
+/* ---- Notes List ---- */
+.popup-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.popup-notes-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.popup-notes-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.popup-note-item {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.popup-note-item:hover {
+  background: rgba(0, 212, 170, 0.04);
+  border-color: rgba(0, 212, 170, 0.12);
+}
+
+.popup-note-content {
+  font-size: 13px;
+  color: rgba(228, 228, 231, 0.8);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.popup-note-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(228, 228, 231, 0.3);
+}
+
+.popup-note-source {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-note-time {
+  color: rgba(0, 212, 170, 0.6);
+  font-weight: 500;
+}
+
+.popup-empty {
+  text-align: center;
+  padding: 20px;
+  color: rgba(228, 228, 231, 0.2);
+  font-size: 13px;
+}
+
+/* ---- Shortcuts ---- */
+.popup-shortcuts {
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(228, 228, 231, 0.35);
+}
+
+.popup-shortcut kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 11px;
+  color: #00d4aa;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* ---- Open Notebook ---- */
+.popup-open-notebook {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 18px 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, #00d4aa, #00b894);
+  border: none;
+  border-radius: 12px;
+  color: #0f1117;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: -0.2px;
+}
+
+.popup-open-notebook:hover {
+  background: linear-gradient(135deg, #00e6b8, #00d4aa);
+  box-shadow: 0 4px 20px rgba(0, 212, 170, 0.35);
+  transform: translateY(-1px);
+}
+
+.popup-open-notebook:active {
+  transform: translateY(0);
+}

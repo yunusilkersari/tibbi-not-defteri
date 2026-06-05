@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tıbbi Not Defteri</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-logo">
+        <span class="popup-logo-icon">🩺</span>
+        <span class="popup-logo-text">Tıbbi Not Defteri</span>
+      </div>
+      <div class="popup-date" id="currentDate"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="popup-stats">
+      <div class="popup-stat">
+        <span class="popup-stat-value" id="todayCount">0</span>
+        <span class="popup-stat-label">Bugün</span>
+      </div>
+      <div class="popup-stat-divider"></div>
+      <div class="popup-stat">
+        <span class="popup-stat-value" id="totalCount">0</span>
+        <span class="popup-stat-label">Toplam</span>
+      </div>
+      <div class="popup-stat-divider"></div>
+      <div class="popup-stat">
+        <span class="popup-stat-value" id="starredCount">0</span>
+        <span class="popup-stat-label">Yıldızlı</span>
+      </div>
+    </div>
+
+    <!-- Quick Note -->
+    <div class="popup-quick-note">
+      <textarea id="quickNoteInput" placeholder="Hızlı not ekle..." rows="2"></textarea>
+      <button class="popup-quick-note-btn" id="quickNoteBtn">
+        <span>📝</span> Kaydet
+      </button>
+    </div>
+
+    <!-- Recent Notes -->
+    <div class="popup-section">
+      <div class="popup-section-title">Son Notlar</div>
+      <div class="popup-notes-list" id="recentNotes">
+        <div class="popup-empty">Henüz not yok</div>
+      </div>
+    </div>
+
+    <!-- Shortcuts -->
+    <div class="popup-shortcuts">
+      <div class="popup-shortcut">
+        <kbd>Alt+Q</kbd>
+        <span>Seçili metni aktar</span>
+      </div>
+      <div class="popup-shortcut">
+        <kbd>Alt+1</kbd>
+        <span>AI yanıtını paragraflara böl</span>
+      </div>
+      <div class="popup-shortcut">
+        <kbd>Alt+2</kbd>
+        <span>AI yanıtını tümüyle aktar</span>
+      </div>
+    </div>
+
+    <!-- Open Notebook -->
+    <button class="popup-open-notebook" id="openNotebook">
+      <span>📖</span> Not Defterini Aç
+    </button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

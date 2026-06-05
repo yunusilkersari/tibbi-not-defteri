@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>İkon Oluşturucu</title>
+  <style>
+    body { background: #222; color: white; font-family: sans-serif; padding: 40px; text-align: center; }
+    canvas { margin: 10px; border: 1px solid #555; }
+    .label { color: #aaa; font-size: 12px; margin-top: 4px; }
+    button { margin: 20px; padding: 12px 30px; background: #00d4aa; color: #0f1117; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:hover { background: #00e6b8; }
+    .instructions { max-width: 600px; margin: 20px auto; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <h1>🩺 Tıbbi Not Defteri - İkon Oluşturucu</h1>
+  <div id="canvasContainer"></div>
+  <button onclick="downloadAll()">Tüm İkonları İndir</button>
+  <div class="instructions">
+    <p>İkonlar otomatik oluşturuldu. "Tüm İkonları İndir" butonuna tıklayarak<br>
+    <code>icons/</code> klasörüne kaydedin.</p>
+  </div>
+
+  <script>
+    const sizes = [16, 32, 48, 128];
+    const canvases = {};
+
+    sizes.forEach(size => {
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'inline-block';
+      wrapper.style.margin = '10px';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.style.width = Math.max(size, 64) + 'px';
+      canvas.style.height = Math.max(size, 64) + 'px';
+      canvas.style.imageRendering = 'pixelated';
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = `${size}x${size}`;
+
+      wrapper.appendChild(canvas);
+      wrapper.appendChild(label);
+      document.getElementById('canvasContainer').appendChild(wrapper);
+
+      canvases[size] = canvas;
+      drawIcon(canvas, size);
+    });
+
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      const radius = size * 0.22;
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#13151d');
+      gradient.addColorStop(1, '#0f1117');
+
+      roundRect(ctx, 0, 0, size, size, radius);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Border glow
+      ctx.strokeStyle = 'rgba(0, 212, 170, 0.5)';
+      ctx.lineWidth = Math.max(1, size * 0.035);
+      ctx.stroke();
+
+      // Medical cross
+      const cx = size / 2;
+      const cy = size * 0.45;
+      const crossH = size * 0.32;
+      const crossW = size * 0.11;
+
+      const crossGrad = ctx.createLinearGradient(cx - crossH/2, cy - crossH/2, cx + crossH/2, cy + crossH/2);
+      crossGrad.addColorStop(0, '#00d4aa');
+      crossGrad.addColorStop(1, '#00e6b8');
+      ctx.fillStyle = crossGrad;
+
+      // Vertical
+      roundRect(ctx, cx - crossW/2, cy - crossH/2, crossW, crossH, crossW * 0.3);
+      ctx.fill();
+      // Horizontal
+      roundRect(ctx, cx - crossH/2, cy - crossW/2, crossH, crossW, crossW * 0.3);
+      ctx.fill();
+
+      // Note lines at bottom
+      if (size >= 32) {
+        const lineY = size * 0.72;
+        const lineSpacing = size * 0.08;
+        ctx.strokeStyle = 'rgba(108, 99, 255, 0.6)';
+        ctx.lineWidth = Math.max(1, size * 0.025);
+
+        for (let i = 0; i < 3; i++) {
+          const y = lineY + i * lineSpacing;
+          const indent = i === 2 ? size * 0.15 : 0;
+          ctx.beginPath();
+          ctx.moveTo(size * 0.25, y);
+          ctx.lineTo(size * 0.75 - indent, y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function downloadAll() {
+      sizes.forEach(size => {
+        const canvas = canvases[size];
+        const link = document.createElement('a');
+        link.download = `icon${size}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
