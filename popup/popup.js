@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const options = { day: 'numeric', month: 'long', year: 'numeric' };
   dateEl.textContent = now.toLocaleDateString('tr-TR', options);
 
+  // Tema yükle
+  await loadTheme();
+
   // İstatistikleri yükle
   await loadStats();
 
@@ -58,6 +61,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('openNotebook').addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'open-notebook' });
     window.close();
+  });
+
+  // Tema değiştirme
+  document.getElementById('popupThemeToggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('.popup-theme-btn');
+    if (!btn) return;
+    const theme = btn.dataset.theme;
+    applyTheme(theme);
+    // Tercihi kaydet
+    chrome.storage.local.get('preferences', (result) => {
+      const prefs = result.preferences || {};
+      prefs.theme = theme;
+      chrome.storage.local.set({ preferences: prefs });
+    });
   });
 });
 
@@ -127,4 +144,27 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+async function loadTheme() {
+  try {
+    const result = await chrome.storage.local.get('preferences');
+    const prefs = result.preferences || {};
+    const theme = prefs.theme || 'dark';
+    applyTheme(theme);
+  } catch (e) {
+    // varsayılan koyu tema
+  }
+}
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+  // Toggle butonlarını güncelle
+  document.querySelectorAll('.popup-theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
 }

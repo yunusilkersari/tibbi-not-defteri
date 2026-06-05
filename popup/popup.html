@@ -14,7 +14,13 @@
         <span class="popup-logo-icon">🩺</span>
         <span class="popup-logo-text">Tıbbi Not Defteri</span>
       </div>
-      <div class="popup-date" id="currentDate"></div>
+      <div class="popup-header-right">
+        <button class="popup-open-btn" id="openNotebook" title="Defteri Aç">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+          Defteri Aç
+        </button>
+        <span class="popup-date" id="currentDate"></span>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -67,10 +73,13 @@
       </div>
     </div>
 
-    <!-- Open Notebook -->
-    <button class="popup-open-notebook" id="openNotebook">
-      <span>📖</span> Not Defterini Aç
-    </button>
+    <!-- Tema & Ayarlar -->
+    <div class="popup-footer">
+      <div class="popup-theme-toggle" id="popupThemeToggle">
+        <button class="popup-theme-btn active" data-theme="dark">🌙 Koyu</button>
+        <button class="popup-theme-btn" data-theme="light">☀️ Açık</button>
+      </div>
+    </div>
   </div>
 
   <script src="popup.js"></script>

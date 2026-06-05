@@ -63,7 +63,178 @@ body {
   font-weight: 500;
 }
 
-/* ---- Stats ---- */
+.popup-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.popup-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #00d4aa, #00b894);
+  border: none;
+  border-radius: 8px;
+  color: #0a0b10;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.popup-open-btn:hover {
+  background: linear-gradient(135deg, #00e6b8, #00d4aa);
+  box-shadow: 0 2px 12px rgba(0, 212, 170, 0.35);
+  transform: translateY(-1px);
+}
+
+.popup-open-btn:active {
+  transform: translateY(0);
+}
+
+.popup-open-btn svg {
+  flex-shrink: 0;
+}
+
+/* ---- Footer & Theme Toggle ---- */
+.popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-theme-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.popup-theme-btn {
+  padding: 5px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(228, 228, 231, 0.35);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.popup-theme-btn:hover {
+  color: rgba(228, 228, 231, 0.7);
+}
+
+.popup-theme-btn.active {
+  background: rgba(0, 212, 170, 0.12);
+  color: #00d4aa;
+  font-weight: 600;
+}
+
+/* ---- Light Theme for Popup ---- */
+body.light-theme {
+  background: #f4f5f7;
+  color: #1a1c20;
+}
+
+body.light-theme .popup-header {
+  background: linear-gradient(180deg, rgba(0, 168, 132, 0.06), transparent);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .popup-stat-value {
+  color: #00a884;
+}
+
+body.light-theme .popup-stat-label,
+body.light-theme .popup-date {
+  color: rgba(26, 28, 32, 0.4);
+}
+
+body.light-theme .popup-stat-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .popup-quick-note textarea {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #1a1c20;
+}
+
+body.light-theme .popup-quick-note textarea::placeholder {
+  color: rgba(26, 28, 32, 0.3);
+}
+
+body.light-theme .popup-quick-note-btn {
+  background: linear-gradient(135deg, rgba(0, 168, 132, 0.12), rgba(0, 168, 132, 0.06));
+  border-color: rgba(0, 168, 132, 0.2);
+  color: #00a884;
+}
+
+body.light-theme .popup-note-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .popup-note-content {
+  color: rgba(26, 28, 32, 0.8);
+}
+
+body.light-theme .popup-note-meta,
+body.light-theme .popup-section-title {
+  color: rgba(26, 28, 32, 0.35);
+}
+
+body.light-theme .popup-note-time {
+  color: rgba(0, 168, 132, 0.7);
+}
+
+body.light-theme .popup-shortcut {
+  color: rgba(26, 28, 32, 0.35);
+}
+
+body.light-theme .popup-shortcut kbd {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #00a884;
+}
+
+body.light-theme .popup-shortcuts,
+body.light-theme .popup-quick-note,
+body.light-theme .popup-stats,
+body.light-theme .popup-footer {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .popup-theme-toggle {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .popup-theme-btn {
+  color: rgba(26, 28, 32, 0.35);
+}
+
+body.light-theme .popup-theme-btn.active {
+  background: rgba(0, 168, 132, 0.10);
+  color: #00a884;
+}
+
+body.light-theme .popup-open-btn {
+  color: #ffffff;
+}
+
 .popup-stats {
   display: flex;
   align-items: center;
@@ -271,32 +442,4 @@ body {
   text-align: center;
 }
 
-/* ---- Open Notebook ---- */
-.popup-open-notebook {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 12px 18px 16px;
-  padding: 12px;
-  background: linear-gradient(135deg, #00d4aa, #00b894);
-  border: none;
-  border-radius: 12px;
-  color: #0f1117;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: -0.2px;
-}
 
-.popup-open-notebook:hover {
-  background: linear-gradient(135deg, #00e6b8, #00d4aa);
-  box-shadow: 0 4px 20px rgba(0, 212, 170, 0.35);
-  transform: translateY(-1px);
-}
-
-.popup-open-notebook:active {
-  transform: translateY(0);
-}

@@ -102,23 +102,39 @@
     });
   }
 
+  // Seçim varsa butonu konumlandır/göster
+  function updateButtonForSelection() {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 3 && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Seçimin ekranda görünür olup olmadığını kontrol et
+      // rect tüm seçimi kapsar, en azından bir kısmı ekranda olmalı
+      if (rect.width === 0 && rect.height === 0) return;
+
+      // Butonu seçimin sağ üst köşesine konumlandır (viewport koordinatları)
+      showFloatButton(rect.right, rect.top);
+    } else {
+      hideFloatButton();
+    }
+  }
+
   // Metin seçimi algılama
   document.addEventListener('mouseup', (e) => {
     // Kendi elementlerimize tıklandıysa atla
     if (e.target.closest('.tnd-root') || e.target.closest('.tnd-float-btn') || e.target.closest('.tnd-ai-panel')) return;
 
-    setTimeout(() => {
-      const selection = window.getSelection();
-      const text = selection.toString().trim();
+    setTimeout(updateButtonForSelection, 10);
+  });
 
-      if (text.length > 3) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        showFloatButton(rect.right, rect.top);
-      } else {
-        hideFloatButton();
-      }
-    }, 10);
+  // Seçim değiştiğinde butonu güncelle (drag-scroll senaryoları için)
+  let selectionChangeTimer = null;
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(selectionChangeTimer);
+    selectionChangeTimer = setTimeout(updateButtonForSelection, 100);
   });
 
   // Sayfa tıklandığında butonu gizle
@@ -128,9 +144,11 @@
     }
   });
 
-  // Scroll'da gizle
+  // Scroll'da seçim varsa butonu yeniden konumlandır, yoksa gizle
+  let scrollTimer = null;
   document.addEventListener('scroll', () => {
-    hideFloatButton();
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(updateButtonForSelection, 50);
   }, { passive: true });
 
   // Toast bildirimi göster (global erişim için)

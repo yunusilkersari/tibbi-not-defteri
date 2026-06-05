@@ -19,7 +19,10 @@
     searchQuery: '',
     editingNoteId: null,
     deletingNoteId: null,
-    readingNoteId: null
+    readingNoteId: null,
+    readingNoteIndex: -1,
+    readModalNotes: [],
+    readModalFullscreen: false
   };
 
   // ==========================================
@@ -99,17 +102,27 @@
     deleteModal: document.getElementById('deleteModal'),
 
     readModal: document.getElementById('readModal'),
+    readModalDialog: document.getElementById('readModalDialog'),
     readModalContent: document.getElementById('readModalContent'),
     readModalUserNote: document.getElementById('readModalUserNote'),
     readModalSource: document.getElementById('readModalSource'),
     readModalTags: document.getElementById('readModalTags'),
-    readModalMeta: document.getElementById('readModalMeta')
+    readModalMeta: document.getElementById('readModalMeta'),
+    readModalPrev: document.getElementById('readModalPrev'),
+    readModalNext: document.getElementById('readModalNext'),
+    readModalCounter: document.getElementById('readModalCounter'),
+    readModalFullscreen: document.getElementById('readModalFullscreen'),
+    readModalWidthControl: document.getElementById('readModalWidthControl'),
+    readModalWidthSlider: document.getElementById('readModalWidthSlider'),
+    readModalWidthValue: document.getElementById('readModalWidthValue'),
+    themeToggle: document.getElementById('themeToggle')
   };
 
   // ==========================================
   // Başlatma
   // ==========================================
   async function init() {
+    await loadPreferences();
     updateTopbar();
     renderCalendar();
     await refreshAll();
@@ -196,13 +209,38 @@
     document.getElementById('deleteModalCancel').addEventListener('click', closeDeleteModal);
     document.getElementById('deleteModalConfirm').addEventListener('click', handleDeleteConfirm);
 
-    // ESC ile modalları kapat
+    // ESC ile modalları kapat, sol/sağ ok ile notlar arası geçiş
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeEditModal();
         closeNewNoteModal();
         closeDeleteModal();
         closeReadModal();
+      }
+      // Read modal açıkken sol/sağ ok: notlar arası geçiş
+      if (DOM.readModal.style.display !== 'none' && state.readModalNotes.length > 0) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          navigateReadModal(-1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          navigateReadModal(1);
+        }
+      }
+    });
+
+    // Read modal body'yi focusable yap (ok tuşlarıyla scroll için)
+    const readModalBody = DOM.readModal.querySelector('.modal-body');
+    if (readModalBody) {
+      readModalBody.setAttribute('tabindex', '-1');
+      readModalBody.style.outline = 'none';
+    }
+
+    // Read modal içinde herhangi bir yere tıklayınca odağı body'ye ver
+    // böylece ok tuşları her zaman scroll yapar
+    DOM.readModal.addEventListener('mouseup', () => {
+      if (readModalBody) {
+        setTimeout(() => readModalBody.focus(), 150);
       }
     });
 
@@ -217,6 +255,69 @@
           const note = notes.find(n => n.id === noteId);
           if (note) openEditModal(note);
         });
+      }
+    });
+
+    // Read Modal Navigation
+    DOM.readModalPrev.addEventListener('click', () => navigateReadModal(-1));
+    DOM.readModalNext.addEventListener('click', () => navigateReadModal(1));
+
+    // Overlay'e (dışarıya) tıklayınca kapat (tam ekranda değilken)
+    DOM.readModal.addEventListener('click', (e) => {
+      if (e.target === DOM.readModal && !document.fullscreenElement) {
+        closeReadModal();
+      }
+    });
+
+    // Fullscreen toggle
+    DOM.readModalFullscreen.addEventListener('click', toggleReadFullscreen);
+
+    // Width slider toggle (açılır/kapanır panel)
+    document.getElementById('widthToggleBtn').addEventListener('click', () => {
+      const panel = document.getElementById('widthSliderPanel');
+      panel.classList.toggle('open');
+    });
+
+    // Width slider
+    DOM.readModalWidthSlider.addEventListener('input', (e) => {
+      const val = e.target.value;
+      DOM.readModalWidthValue.textContent = val + '%';
+      DOM.readModal.style.setProperty('--read-modal-width', val + '%');
+      savePreferences();
+    });
+    // Slider'dan odağı kaldır (ok tuşlarının içeriği kaydırmasını sağla)
+    DOM.readModalWidthSlider.addEventListener('mouseup', () => {
+      DOM.readModalWidthSlider.blur();
+    });
+    DOM.readModalWidthSlider.addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    // Topbar tam ekran
+    document.getElementById('topbarFullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // Theme toggle
+    DOM.themeToggle.addEventListener('click', (e) => {
+      const btn = e.target.closest('.topbar-theme-btn');
+      if (!btn) return;
+      const theme = btn.dataset.theme;
+      setTheme(theme);
+      savePreferences();
+    });
+
+    // Fullscreen change event (ESC çıkışı algılama)
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        state.readModalFullscreen = false;
+        updateFullscreenIcon(false);
       }
     });
 
@@ -580,7 +681,26 @@
   // ==========================================
   // Read Modal
   // ==========================================
-  function openReadModal(note) {
+  async function openReadModal(note) {
+    // Mevcut not listesini al (navigasyon için)
+    const allCurrentNotes = await getCurrentNoteList();
+    state.readModalNotes = allCurrentNotes;
+    state.readingNoteIndex = allCurrentNotes.findIndex(n => n.id === note.id);
+    if (state.readingNoteIndex === -1) state.readingNoteIndex = 0;
+
+    renderReadModalNote(note);
+    updateReadModalNav();
+    DOM.readModal.style.display = '';
+    focusReadModalBody();
+  }
+
+  // Ok tuşlarıyla scroll için modal body'ye odaklan
+  function focusReadModalBody() {
+    const mb = DOM.readModal.querySelector('.modal-body');
+    if (mb) setTimeout(() => mb.focus(), 100);
+  }
+
+  function renderReadModalNote(note) {
     state.readingNoteId = note.id;
 
     const time = new Date(note.createdAt);
@@ -618,12 +738,133 @@
       DOM.readModalTags.style.display = 'none';
     }
 
-    DOM.readModal.style.display = '';
+    // Modal body scroll'u en üste al
+    const modalBody = DOM.readModalContent.closest('.modal-body');
+    if (modalBody) modalBody.scrollTop = 0;
+  }
+
+  function updateReadModalNav() {
+    const total = state.readModalNotes.length;
+    const idx = state.readingNoteIndex;
+
+    DOM.readModalPrev.disabled = idx <= 0;
+    DOM.readModalNext.disabled = idx >= total - 1;
+    DOM.readModalCounter.textContent = `${idx + 1} / ${total}`;
+  }
+
+  function navigateReadModal(direction) {
+    const newIndex = state.readingNoteIndex + direction;
+    if (newIndex < 0 || newIndex >= state.readModalNotes.length) return;
+
+    state.readingNoteIndex = newIndex;
+    const note = state.readModalNotes[newIndex];
+    renderReadModalNote(note);
+    updateReadModalNav();
+    focusReadModalBody();
+  }
+
+  function toggleReadFullscreen() {
+    if (!document.fullscreenElement) {
+      // Tam ekrana geç
+      DOM.readModal.requestFullscreen().then(() => {
+        state.readModalFullscreen = true;
+        updateFullscreenIcon(true);
+        focusReadModalBody();
+      }).catch(err => {
+        console.warn('Fullscreen error:', err);
+      });
+    } else {
+      // Tam ekrandan çık
+      document.exitFullscreen().then(() => {
+        state.readModalFullscreen = false;
+        updateFullscreenIcon(false);
+      });
+    }
+  }
+
+  function updateFullscreenIcon(isFullscreen) {
+    if (isFullscreen) {
+      DOM.readModalFullscreen.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>';
+      DOM.readModalFullscreen.title = 'Küçült (ESC)';
+    } else {
+      DOM.readModalFullscreen.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>';
+      DOM.readModalFullscreen.title = 'Tam Ekran';
+    }
+  }
+
+  // Mevcut filtreleme durumuna göre not listesini getir
+  async function getCurrentNoteList() {
+    if (state.searchQuery) {
+      return await NotStorage.getFiltered({ search: state.searchQuery });
+    } else if (state.selectedDate) {
+      return await NotStorage.getByDate(state.selectedDate);
+    } else if (state.activeFilter === 'today') {
+      return await NotStorage.getToday();
+    } else if (state.activeFilter === 'starred') {
+      return await NotStorage.getFiltered({ starred: true });
+    } else if (state.activeTag) {
+      return await NotStorage.getFiltered({ tag: state.activeTag });
+    } else {
+      return await NotStorage.getAll();
+    }
   }
 
   function closeReadModal() {
+    // Tam ekrandaysa önce çık
+    if (document.fullscreenElement) {
+      document.exitFullscreen().then(() => {
+        finishCloseReadModal();
+      });
+    } else {
+      finishCloseReadModal();
+    }
+  }
+
+  function finishCloseReadModal() {
     DOM.readModal.style.display = 'none';
     state.readingNoteId = null;
+    state.readingNoteIndex = -1;
+    state.readModalNotes = [];
+    state.readModalFullscreen = false;
+    updateFullscreenIcon(false);
+  }
+
+  // ==========================================
+  // Tercihler (Preferences)
+  // ==========================================
+  async function loadPreferences() {
+    try {
+      const result = await chrome.storage.local.get('preferences');
+      const prefs = result.preferences || {};
+
+      // Tema
+      const theme = prefs.theme || 'dark';
+      setTheme(theme);
+
+      // İçerik genişliği
+      const width = prefs.readModalWidth || 65;
+      DOM.readModalWidthSlider.value = width;
+      DOM.readModalWidthValue.textContent = width + '%';
+      DOM.readModal.style.setProperty('--read-modal-width', width + '%');
+    } catch (e) {
+      console.warn('Tercihler yüklenemedi:', e);
+    }
+  }
+
+  function savePreferences() {
+    const prefs = {
+      theme: document.documentElement.getAttribute('data-theme') || 'dark',
+      readModalWidth: parseInt(DOM.readModalWidthSlider.value, 10)
+    };
+    chrome.storage.local.set({ preferences: prefs });
+  }
+
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    // Toggle butonlarını güncelle
+    DOM.themeToggle.querySelectorAll('.topbar-theme-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
   }
 
   // ==========================================

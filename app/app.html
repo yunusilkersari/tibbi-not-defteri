@@ -95,6 +95,7 @@
           </div>
         </div>
 
+
         <!-- Stats -->
         <div class="sidebar-section sidebar-stats">
           <div class="sidebar-stat-row">
@@ -138,6 +139,13 @@
           <span class="topbar-date-full" id="topbarDate"></span>
         </div>
         <div class="topbar-actions">
+          <div class="topbar-theme-toggle" id="themeToggle">
+            <button class="topbar-theme-btn active" data-theme="dark" title="Koyu Tema">🌙</button>
+            <button class="topbar-theme-btn" data-theme="light" title="Açık Tema">☀️</button>
+          </div>
+          <button class="topbar-icon-btn" id="topbarFullscreen" title="Tam Ekran">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          </button>
           <span class="topbar-note-count" id="topbarNoteCount">0 not</span>
         </div>
       </div>
@@ -229,11 +237,23 @@
 
   <!-- Read Note Modal -->
   <div class="modal-overlay" id="readModal" style="display:none">
-    <div class="modal" style="width: min(720px, 90vw);">
+    <div class="modal read-modal" id="readModalDialog" style="width: min(720px, 90vw);">
       <div class="modal-header">
         <h2 class="modal-title">📖 Notu Oku</h2>
+        <div class="read-modal-width-control" id="readModalWidthControl">
+          <button class="width-toggle-btn" id="widthToggleBtn" title="Genişlik Ayarla">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3H3v18h18V3zM9 3v18M15 3v18"/></svg>
+          </button>
+          <div class="width-slider-panel" id="widthSliderPanel">
+            <input type="range" class="width-slider" id="readModalWidthSlider" min="40" max="100" value="65" title="İçerik genişliği">
+            <span class="width-value" id="readModalWidthValue">65%</span>
+          </div>
+        </div>
         <div style="display:flex; gap:6px; align-items:center;">
           <span class="read-modal-meta" id="readModalMeta"></span>
+          <button class="modal-header-btn" id="readModalFullscreen" title="Tam Ekran">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          </button>
           <button class="modal-close" id="readModalClose">✕</button>
         </div>
       </div>
@@ -243,9 +263,22 @@
         <div id="readModalSource" style="display:none; margin-top:16px; font-size:12px; color:var(--text-tertiary);"></div>
         <div id="readModalTags" style="display:none; margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;"></div>
       </div>
-      <div class="modal-footer">
-        <button class="modal-btn modal-btn-secondary" id="readModalEditBtn">✏️ Düzenle</button>
-        <button class="modal-btn modal-btn-primary" id="readModalCloseBtn">Kapat</button>
+      <div class="modal-footer read-modal-footer">
+        <div class="read-modal-nav">
+          <button class="modal-btn modal-btn-nav" id="readModalPrev" title="Önceki Not">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>Önceki</span>
+          </button>
+          <span class="read-modal-counter" id="readModalCounter"></span>
+          <button class="modal-btn modal-btn-nav" id="readModalNext" title="Sonraki Not">
+            <span>Sonraki</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="read-modal-actions">
+          <button class="modal-btn modal-btn-secondary" id="readModalEditBtn">✏️ Düzenle</button>
+          <button class="modal-btn modal-btn-primary" id="readModalCloseBtn">Kapat</button>
+        </div>
       </div>
     </div>
   </div>
