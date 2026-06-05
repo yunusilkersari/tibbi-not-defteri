@@ -209,7 +209,95 @@
     document.getElementById('deleteModalCancel').addEventListener('click', closeDeleteModal);
     document.getElementById('deleteModalConfirm').addEventListener('click', handleDeleteConfirm);
 
-    // ESC ile modalları kapat, sol/sağ ok ile notlar arası geçiş
+    // Read modal body ve overlay'i focusable yap
+    const readModalBody = DOM.readModal.querySelector('.modal-body');
+    if (readModalBody) {
+      readModalBody.setAttribute('tabindex', '0');
+      readModalBody.style.outline = 'none';
+    }
+    DOM.readModal.setAttribute('tabindex', '-1');
+    DOM.readModal.style.outline = 'none';
+
+    // Okuma modalı klavye fonksiyonu
+    function handleReadModalKeydown(e) {
+      // Read modal açık değilse işlem yapma
+      if (DOM.readModal.style.display === 'none') return;
+
+      const activeEl = document.activeElement;
+      const isSlider = activeEl === DOM.readModalWidthSlider;
+
+      // Sol/sağ ok: Notlar arası geçiş (genişlik slider'ı odakta değilse)
+      if (state.readModalNotes.length > 0 && !isSlider) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          e.stopPropagation();
+          navigateReadModal(-1);
+          return;
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          e.stopPropagation();
+          navigateReadModal(1);
+          return;
+        }
+      }
+
+      // ArrowUp/ArrowDown: İçeriği kaydır
+      // Gerçek scrollable elemanı bul ve programatik olarak kaydır
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const scrollTarget = findScrollableElement();
+        if (scrollTarget) {
+          const delta = e.key === 'ArrowDown' ? 60 : -60;
+          scrollTarget.scrollBy({ top: delta, behavior: 'auto' });
+        }
+      } else if (e.key === 'PageUp' || e.key === 'PageDown') {
+        const scrollTarget = findScrollableElement();
+        if (scrollTarget) {
+          e.preventDefault();
+          const delta = e.key === 'PageDown' ? scrollTarget.clientHeight * 0.85 : -scrollTarget.clientHeight * 0.85;
+          scrollTarget.scrollBy({ top: delta, behavior: 'auto' });
+        }
+      } else if (e.key === 'Home' && !isSlider) {
+        const scrollTarget = findScrollableElement();
+        if (scrollTarget) {
+          e.preventDefault();
+          scrollTarget.scrollTop = 0;
+        }
+      } else if (e.key === 'End' && !isSlider) {
+        const scrollTarget = findScrollableElement();
+        if (scrollTarget) {
+          e.preventDefault();
+          scrollTarget.scrollTop = scrollTarget.scrollHeight;
+        }
+      } else if (e.key === ' ') {
+        const isEditing = activeEl &&
+          (activeEl.tagName === 'TEXTAREA' ||
+           (activeEl.tagName === 'INPUT' && activeEl.type !== 'range'));
+        if (!isEditing) {
+          e.preventDefault();
+          const scrollTarget = findScrollableElement();
+          if (scrollTarget) {
+            const direction = e.shiftKey ? -1 : 1;
+            scrollTarget.scrollBy({ top: direction * scrollTarget.clientHeight * 0.85, behavior: 'auto' });
+          }
+        }
+      }
+    }
+
+    // Modal içindeki gerçek scrollable elemanı bul
+    // (.modal-body veya #readModalContent — hangisi gerçekten taşıyorsa)
+    function findScrollableElement() {
+      const mb = DOM.readModal.querySelector('.modal-body');
+      if (!mb) return null;
+      // modal-body scroll edilebilir mi?
+      if (mb.scrollHeight > mb.clientHeight + 1) return mb;
+      // İçerideki content div scroll edilebilir mi?
+      const content = mb.querySelector('#readModalContent');
+      if (content && content.scrollHeight > content.clientHeight + 1) return content;
+      // Hiçbiri değilse yine de modal-body'yi döndür
+      return mb;
+    }
+
+    // Klavye kontrolleri
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeEditModal();
@@ -217,30 +305,18 @@
         closeDeleteModal();
         closeReadModal();
       }
-      // Read modal açıkken sol/sağ ok: notlar arası geçiş
-      if (DOM.readModal.style.display !== 'none' && state.readModalNotes.length > 0) {
-        if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          navigateReadModal(-1);
-        } else if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          navigateReadModal(1);
+      handleReadModalKeydown(e);
+    }, { passive: false });
+
+    // Tam ekrandayken kullanıcının tıklamalarıyla odağın kaybolmasını önleme
+    // (document.documentElement fullscreen kullanıldığı için tüm DOM erişilebilir,
+    //  ama odak yine de butonlara veya overlay'e düşebilir)
+    DOM.readModal.addEventListener('click', (e) => {
+      if (document.fullscreenElement) {
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        if (!['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(activeTag)) {
+          focusReadModalBody();
         }
-      }
-    });
-
-    // Read modal body'yi focusable yap (ok tuşlarıyla scroll için)
-    const readModalBody = DOM.readModal.querySelector('.modal-body');
-    if (readModalBody) {
-      readModalBody.setAttribute('tabindex', '-1');
-      readModalBody.style.outline = 'none';
-    }
-
-    // Read modal içinde herhangi bir yere tıklayınca odağı body'ye ver
-    // böylece ok tuşları her zaman scroll yapar
-    DOM.readModal.addEventListener('mouseup', () => {
-      if (readModalBody) {
-        setTimeout(() => readModalBody.focus(), 150);
       }
     });
 
@@ -264,7 +340,7 @@
 
     // Overlay'e (dışarıya) tıklayınca kapat (tam ekranda değilken)
     DOM.readModal.addEventListener('click', (e) => {
-      if (e.target === DOM.readModal && !document.fullscreenElement) {
+      if (e.target === DOM.readModal && !state.readModalFullscreen) {
         closeReadModal();
       }
     });
@@ -285,13 +361,15 @@
       DOM.readModal.style.setProperty('--read-modal-width', val + '%');
       savePreferences();
     });
-    // Slider'dan odağı kaldır (ok tuşlarının içeriği kaydırmasını sağla)
-    DOM.readModalWidthSlider.addEventListener('mouseup', () => {
-      DOM.readModalWidthSlider.blur();
-    });
+    // Slider üzerinde iken ok tuşlarının slider değerini değiştirmesini engelle
+    // ve odağı modal body'ye geri ver, böylece ok tuşları içeriği kaydırır
     DOM.readModalWidthSlider.addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
+        e.stopPropagation();
+        // Slider'dan odağı al ve modal body'ye ver
+        DOM.readModalWidthSlider.blur();
+        focusReadModalBody();
       }
     });
 
@@ -313,11 +391,19 @@
       savePreferences();
     });
 
-    // Fullscreen change event (ESC çıkışı algılama)
+    // Fullscreen change event (ESC çıkışı algılama + tam ekrana girişte odak ayarla)
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
         state.readModalFullscreen = false;
         updateFullscreenIcon(false);
+      } else {
+        // Tam ekrana girildikten sonra odağı modal body'ye ver
+        // Çift rAF ile tarayıcının render geçişini tamamlamasını bekliyoruz
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            focusReadModalBody();
+          });
+        });
       }
     });
 
@@ -533,6 +619,9 @@
           <button class="note-card-action star-btn ${note.isStarred ? 'starred' : ''}" data-action="star" title="Yıldızla">
             ${note.isStarred ? '⭐' : '☆'}
           </button>
+          <button class="note-card-action read-fullscreen-btn" data-action="readFullscreen" title="Tam Ekranda Oku">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          </button>
           <button class="note-card-action read-btn" data-action="read" title="Oku">📖</button>
           <button class="note-card-action" data-action="edit" title="Düzenle">✏️</button>
           <button class="note-card-action delete-btn" data-action="delete" title="Sil">🗑️</button>
@@ -558,6 +647,9 @@
           break;
         case 'read':
           openReadModal(note);
+          break;
+        case 'readFullscreen':
+          openReadModalFullscreen(note);
           break;
         case 'edit':
           openEditModal(note);
@@ -694,10 +786,28 @@
     focusReadModalBody();
   }
 
+  // Direkt tam ekranda okuma
+  async function openReadModalFullscreen(note) {
+    await openReadModal(note);
+    // Kısa gecikme ile tam ekrana geç (modal render olduktan sonra)
+    setTimeout(() => enterReadFullscreen(), 100);
+  }
+
   // Ok tuşlarıyla scroll için modal body'ye odaklan
   function focusReadModalBody() {
     const mb = DOM.readModal.querySelector('.modal-body');
-    if (mb) setTimeout(() => mb.focus(), 100);
+    if (mb) {
+      // #readModalContent'teki overflow-y:auto'yu kaldır
+      // Böylece tek scroll konteyneri .modal-body olur ve ok tuşları onu kaydırır
+      const content = mb.querySelector('#readModalContent');
+      if (content) {
+        content.style.overflowY = 'visible';
+        content.style.maxHeight = 'none';
+      }
+      requestAnimationFrame(() => {
+        mb.focus({ preventScroll: true });
+      });
+    }
   }
 
   function renderReadModalNote(note) {
@@ -763,16 +873,29 @@
     focusReadModalBody();
   }
 
+  // Document kökünü tam ekrana al — Top Layer izolasyonundan kaçınır
+  // DOM ağacının tamamı erişilebilir kalır, hiçbir eleman inert olmaz
+  async function enterReadFullscreen() {
+    try {
+      await document.documentElement.requestFullscreen();
+      state.readModalFullscreen = true;
+      updateFullscreenIcon(true);
+
+      // Render geçişi tamamlandıktan sonra odağı .modal-body'ye ver
+      // Odak doğru yere düşünce tarayıcının yerel ok tuşu kaydırması çalışır
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          focusReadModalBody();
+        });
+      });
+    } catch (err) {
+      console.warn('Fullscreen error:', err);
+    }
+  }
+
   function toggleReadFullscreen() {
     if (!document.fullscreenElement) {
-      // Tam ekrana geç
-      DOM.readModal.requestFullscreen().then(() => {
-        state.readModalFullscreen = true;
-        updateFullscreenIcon(true);
-        focusReadModalBody();
-      }).catch(err => {
-        console.warn('Fullscreen error:', err);
-      });
+      enterReadFullscreen();
     } else {
       // Tam ekrandan çık
       document.exitFullscreen().then(() => {

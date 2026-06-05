@@ -917,6 +917,12 @@ body {
   color: var(--accent-primary);
 }
 
+.note-card-action.read-fullscreen-btn:hover {
+  background: var(--accent-secondary-dim);
+  border-color: rgba(108, 99, 255, 0.25);
+  color: var(--accent-secondary);
+}
+
 /* Card Content */
 .note-card-content {
   font-size: 14px;
@@ -1480,15 +1486,15 @@ body {
   white-space: nowrap;
 }
 
-/* Fullscreen mode (Browser Fullscreen API) */
-#readModal:fullscreen,
-#readModal:-webkit-full-screen {
+/* Fullscreen mode — document.documentElement tam ekrana alınıyor, modal CSS ile tam ekran gibi gösteriliyor */
+:fullscreen #readModal,
+:-webkit-full-screen #readModal {
   background: var(--bg-primary);
   padding: 0;
 }
 
-#readModal:fullscreen .read-modal,
-#readModal:-webkit-full-screen .read-modal {
+:fullscreen #readModal .read-modal,
+:-webkit-full-screen #readModal .read-modal {
   width: var(--read-modal-width, 65%) !important;
   max-width: var(--read-modal-width, 65%);
   height: 100vh;
@@ -1503,16 +1509,22 @@ body {
   margin: 0 auto;
 }
 
-#readModal:fullscreen .read-modal .modal-body,
-#readModal:-webkit-full-screen .read-modal .modal-body {
+:fullscreen #readModal .read-modal .modal-body,
+:-webkit-full-screen #readModal .read-modal .modal-body {
   max-height: none !important;
   flex: 1;
   overflow-y: auto;
 }
 
-#readModal:fullscreen .read-modal-width-control,
-#readModal:-webkit-full-screen .read-modal-width-control {
+:fullscreen #readModal .read-modal-width-control,
+:-webkit-full-screen #readModal .read-modal-width-control {
   display: flex !important;
+}
+
+/* Root fullscreen olduğunda arka planı ve sidebar'ı gizle */
+:fullscreen .app-layout,
+:-webkit-full-screen .app-layout {
+  display: none;
 }
 
 /* Width control (hidden by default, shown in fullscreen) */
