@@ -97,12 +97,25 @@
     return ans.length > 0 && ans.some(a => c.contains(a));
   }
 
+  const instantApplied = new WeakSet();
+  function forceInstantScroll(c) {
+    // Yumuşak (animasyonlu) kaydırmayı kapat -> kilit sırasında salınım/parlama azalır
+    if (mode !== 'lock' || !c || !c.style) return;
+    try {
+      if (!instantApplied.has(c)) {
+        c.style.scrollBehavior = 'auto';
+        instantApplied.add(c);
+      }
+    } catch (e) { /* yoksay */ }
+  }
+
   function rememberContainer(c) {
     if (isDoc(c)) {
       if (!learnedContainer || !learnedContainer.isConnected) learnedContainer = c;
     } else {
       learnedContainer = c;
     }
+    forceInstantScroll(c);
   }
 
   function container() {
