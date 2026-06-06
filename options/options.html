@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Seçici Ayarları — Tıbbi Not Defteri</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e4e4e7;
+      line-height: 1.6;
+      padding: 32px 16px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 {
+      font-size: 22px;
+      background: linear-gradient(135deg, #00d4aa, #6c63ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    .desc { color: rgba(228,228,231,0.6); font-size: 14px; margin-bottom: 24px; }
+    .desc code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    .platform {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+    .platform h2 { font-size: 15px; margin-bottom: 12px; color: #00d4aa; }
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+    label { display: block; font-size: 12px; color: rgba(228,228,231,0.55); margin-bottom: 4px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 9px 12px;
+      background: #13151d;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #e4e4e7;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: rgba(0,212,170,0.5); }
+    input[type="text"]::placeholder { color: rgba(228,228,231,0.3); }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.12);
+      color: rgba(228,228,231,0.7);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4aa, #00b894);
+      color: #0f1117;
+    }
+    .btn-primary:hover { box-shadow: 0 4px 20px rgba(0,212,170,0.3); }
+    .status { margin-top: 14px; text-align: right; font-size: 13px; color: #00d4aa; min-height: 20px; }
+    .hint { font-size: 12px; color: rgba(228,228,231,0.4); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🔬 AI Seçici Ayarları</h1>
+    <p class="desc">
+      AI platformlarının arayüzü güncellenirse <strong>Soru+Cevap</strong> butonları çalışmayabilir.
+      O zaman ilgili platformun CSS seçicilerini buradan güncelleyebilirsiniz.
+      Boş bırakılan alanlar <strong>varsayılanı</strong> kullanır. Değişiklik sonrası ilgili sekmeyi yenileyin.
+    </p>
+    <div id="platforms"></div>
+    <div class="actions">
+      <button id="resetBtn" class="btn btn-secondary">Varsayılana Sıfırla</button>
+      <button id="saveBtn" class="btn btn-primary">💾 Kaydet</button>
+    </div>
+    <div id="status" class="status"></div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

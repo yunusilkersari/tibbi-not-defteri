@@ -190,7 +190,17 @@
       <div class="modal-body">
         <div class="modal-field">
           <label class="modal-label">İçerik</label>
-          <textarea class="modal-textarea" id="editContent" rows="8"></textarea>
+          <div class="rich-toolbar" id="editToolbar">
+            <button type="button" class="rich-btn" data-cmd="bold" title="Kalın"><b>B</b></button>
+            <button type="button" class="rich-btn" data-cmd="italic" title="İtalik"><i>I</i></button>
+            <button type="button" class="rich-btn" data-cmd="underline" title="Altı çizili"><u>U</u></button>
+            <span class="rich-sep"></span>
+            <button type="button" class="rich-btn" data-cmd="insertUnorderedList" title="Madde listesi">• Liste</button>
+            <button type="button" class="rich-btn" data-cmd="formatBlock" data-value="h3" title="Başlık">H</button>
+            <span class="rich-sep"></span>
+            <button type="button" class="rich-btn" data-cmd="removeFormat" title="Biçimi temizle">✕ Biçim</button>
+          </div>
+          <div class="modal-textarea rich-editor" id="editContent" contenteditable="true"></div>
         </div>
         <div class="modal-field">
           <label class="modal-label">Kişisel Not</label>

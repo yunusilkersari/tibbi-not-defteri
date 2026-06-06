@@ -195,9 +195,40 @@ body {
 .popup-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   padding: 10px 18px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popup-settings-btn {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: rgba(228, 228, 231, 0.65);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.popup-settings-btn:hover {
+  background: rgba(0, 212, 170, 0.12);
+  border-color: rgba(0, 212, 170, 0.3);
+  color: #00d4aa;
+}
+
+body.light-theme .popup-settings-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(26, 28, 32, 0.55);
+}
+
+body.light-theme .popup-settings-btn:hover {
+  background: rgba(0, 168, 132, 0.1);
+  border-color: rgba(0, 168, 132, 0.3);
+  color: #00a884;
 }
 
 .popup-theme-toggle {

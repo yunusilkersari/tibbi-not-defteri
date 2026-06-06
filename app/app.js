@@ -217,6 +217,20 @@
     document.getElementById('editModalCancel').addEventListener('click', closeEditModal);
     document.getElementById('editModalSave').addEventListener('click', handleEditSave);
 
+    // Zengin metin araç çubuğu
+    document.getElementById('editToolbar').addEventListener('mousedown', (e) => {
+      const btn = e.target.closest('.rich-btn');
+      if (!btn) return;
+      e.preventDefault(); // editör seçimini/odağını koru
+      DOM.editContent.focus();
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'formatBlock') {
+        document.execCommand('formatBlock', false, btn.dataset.value);
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+    });
+
     // New Note Modal
     document.getElementById('newNoteModalClose').addEventListener('click', closeNewNoteModal);
     document.getElementById('newNoteModalCancel').addEventListener('click', closeNewNoteModal);
@@ -746,7 +760,10 @@
   // ==========================================
   function openEditModal(note) {
     state.editingNoteId = note.id;
-    DOM.editContent.value = note.content;
+    // Zengin metin editörü: varsa HTML, yoksa düz metni satır sonlarıyla göster
+    DOM.editContent.innerHTML = note.contentHtml
+      ? note.contentHtml
+      : escapeHtml(note.content || '').replace(/\n/g, '<br>');
     DOM.editUserNote.value = note.userNote || '';
     DOM.editTags.value = (note.tags || []).join(', ');
     DOM.editModal.style.display = '';
@@ -765,9 +782,13 @@
       .map(t => t.trim().toLowerCase())
       .filter(t => t.length > 0);
 
+    const contentHtml = sanitizeRichHtml(DOM.editContent.innerHTML);
+    const contentText = (DOM.editContent.innerText || '').trim();
+
     await NotStorage.update({
       id: state.editingNoteId,
-      content: DOM.editContent.value,
+      content: contentText,
+      contentHtml,
       userNote: DOM.editUserNote.value,
       tags
     });
@@ -1302,6 +1323,34 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // Zengin editör HTML'ini güvenli biçim etiketleriyle sınırla
+  function sanitizeRichHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const allowed = new Set([
+      'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI',
+      'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'BR',
+      'A', 'BLOCKQUOTE', 'PRE', 'CODE', 'DIV', 'SPAN', 'IMG', 'TABLE',
+      'THEAD', 'TBODY', 'TR', 'TH', 'TD'
+    ]);
+    tmp.querySelectorAll('*').forEach((el) => {
+      if (!allowed.has(el.tagName)) {
+        // İzinsiz etiketi çöz: içeriğini yerine koy
+        el.replaceWith(...el.childNodes);
+        return;
+      }
+      Array.from(el.attributes).forEach((attr) => {
+        const n = attr.name.toLowerCase();
+        const v = (attr.value || '').trim();
+        // a[href] ve img[src] (javascript: hariç) ve temel stil kalsın
+        if (el.tagName === 'A' && n === 'href' && !/^\s*(javascript|vbscript):/i.test(v)) return;
+        if (el.tagName === 'IMG' && (n === 'src' || n === 'alt') && !/^\s*(javascript|vbscript):/i.test(v)) return;
+        el.removeAttribute(attr.name);
+      });
+    });
+    return tmp.innerHTML;
   }
 
   // ==========================================

@@ -72,6 +72,33 @@
     '[data-message-author-role="user"], [data-testid="user-message"], .font-user-message, ' +
     'user-query .query-text, .query-text';
 
+  // Kullanıcı tanımlı seçici override'ları (Ayarlar > AI Seçici Ayarları'ndan)
+  // AI platformları arayüzünü değiştirirse, kullanıcı buradan düzeltebilir.
+  function applyCustomSelectors(custom) {
+    if (!custom) return;
+    Object.keys(custom).forEach((name) => {
+      if (!AI_SELECTORS[name]) return;
+      const o = custom[name] || {};
+      if (o.responseSelector && o.responseSelector.trim()) {
+        AI_SELECTORS[name].responseSelector = o.responseSelector.trim();
+      }
+      if (o.userSelector && o.userSelector.trim()) {
+        AI_SELECTORS[name].userSelector = o.userSelector.trim();
+      }
+    });
+  }
+
+  try {
+    chrome.storage.local.get('customSelectors', (r) => applyCustomSelectors(r.customSelectors));
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.customSelectors) {
+        applyCustomSelectors(changes.customSelectors.newValue);
+      }
+    });
+  } catch (e) {
+    // storage erişilemezse varsayılan seçiciler kullanılır
+  }
+
   /**
    * Mevcut sayfanın hangi AI platformuna ait olduğunu belirle
    */

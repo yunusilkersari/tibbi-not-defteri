@@ -76,6 +76,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.close();
   });
 
+  // Ayarlar (AI seçici paneli) aç
+  document.getElementById('openSettings').addEventListener('click', () => {
+    if (chrome.runtime.openOptionsPage) {
+      chrome.runtime.openOptionsPage();
+    } else {
+      window.open(chrome.runtime.getURL('options/options.html'));
+    }
+    window.close();
+  });
+
   // Tema değiştirme
   document.getElementById('popupThemeToggle').addEventListener('click', (e) => {
     const btn = e.target.closest('.popup-theme-btn');
