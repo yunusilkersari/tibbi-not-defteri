@@ -312,7 +312,20 @@
     const temp = document.createElement('div');
     temp.innerHTML = html;
     // Tehlikeli etiketleri kaldır
-    temp.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove());
+    temp.querySelectorAll('script, style, iframe, object, embed, link, meta, noscript').forEach(el => el.remove());
+    // Olay attribute'larını (onclick, onerror...) ve javascript: URL'lerini temizle
+    temp.querySelectorAll('*').forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const value = (attr.value || '').trim();
+        if (name.startsWith('on')) {
+          el.removeAttribute(attr.name);
+        } else if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+                   /^\s*(javascript|data:text\/html|vbscript):/i.test(value)) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
     // Gereksiz boş satırları temizle
     let cleaned = temp.innerHTML;
     cleaned = cleaned.replace(/(\s*<br\s*\/?>\s*){3,}/gi, '<br><br>');
@@ -329,6 +342,10 @@
     buildQA,
     getAnswerElements,
     getQuestionElements,
-    findAnswerFor
+    findAnswerFor,
+    cleanHtml
   };
+
+  // Diğer içerik scriptleri kayıttan önce HTML temizlemek için kullanır
+  window.__TND_sanitizeHtml = cleanHtml;
 })();

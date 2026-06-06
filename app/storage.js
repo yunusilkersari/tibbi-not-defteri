@@ -77,7 +77,7 @@ const NotStorage = {
     const notes = await this.getAll();
     const data = {
       app: 'Tıbbi Not Defteri',
-      version: '1.0.0',
+      version: '1.1.0',
       exportedAt: new Date().toISOString(),
       noteCount: notes.length,
       notes

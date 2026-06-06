@@ -22,8 +22,13 @@
     readingNoteId: null,
     readingNoteIndex: -1,
     readModalNotes: [],
-    readModalFullscreen: false
+    readModalFullscreen: false,
+    renderList: [],
+    renderedCount: 0
   };
+
+  // Liste performansı: çok not olduğunda kademeli render
+  const NOTES_PAGE_SIZE = 50;
 
   // ==========================================
   // Türkçe Tarih Yardımcıları
@@ -548,32 +553,54 @@
     // Not sayısını güncelle
     DOM.topbarNoteCount.textContent = `${notes.length} not`;
 
+    // Mevcut kartları ve "daha fazla" butonunu temizle
+    DOM.notesContainer.querySelectorAll('.note-card, .load-more-btn').forEach(c => c.remove());
+
     // Boş durum
     if (notes.length === 0) {
       DOM.notesEmpty.classList.remove('hidden');
-      // Remove existing cards
-      DOM.notesContainer.querySelectorAll('.note-card').forEach(c => c.remove());
       return;
     }
 
     DOM.notesEmpty.classList.add('hidden');
 
-    // Not kartlarını oluştur
-    const fragment = document.createDocumentFragment();
-    notes.forEach((note, index) => {
-      const card = createNoteCard(note, index);
-      fragment.appendChild(card);
-    });
+    // İlk grubu render et, kalanı "Daha fazla göster" ile
+    state.renderList = notes;
+    state.renderedCount = 0;
+    renderNextBatch();
+  }
 
-    // Mevcut kartları temizle
-    DOM.notesContainer.querySelectorAll('.note-card').forEach(c => c.remove());
+  // Sonraki not grubunu ekle (kademeli render)
+  function renderNextBatch() {
+    const start = state.renderedCount;
+    const end = Math.min(start + NOTES_PAGE_SIZE, state.renderList.length);
+
+    // Önceki "daha fazla" butonunu kaldır
+    const oldBtn = DOM.notesContainer.querySelector('.load-more-btn');
+    if (oldBtn) oldBtn.remove();
+
+    const fragment = document.createDocumentFragment();
+    for (let i = start; i < end; i++) {
+      fragment.appendChild(createNoteCard(state.renderList[i], i));
+    }
     DOM.notesContainer.appendChild(fragment);
+    state.renderedCount = end;
+
+    // Kalan varsa buton ekle
+    if (state.renderedCount < state.renderList.length) {
+      const remaining = state.renderList.length - state.renderedCount;
+      const btn = document.createElement('button');
+      btn.className = 'load-more-btn';
+      btn.textContent = `Daha fazla göster (${remaining} kaldı)`;
+      btn.addEventListener('click', renderNextBatch);
+      DOM.notesContainer.appendChild(btn);
+    }
   }
 
   function createNoteCard(note, index) {
     const card = document.createElement('div');
     card.className = `note-card${note.isStarred ? ' starred' : ''}`;
-    card.style.animationDelay = `${index * 0.04}s`;
+    card.style.animationDelay = `${Math.min(index, 12) * 0.04}s`;
     card.dataset.noteId = note.id;
 
     const time = new Date(note.createdAt);

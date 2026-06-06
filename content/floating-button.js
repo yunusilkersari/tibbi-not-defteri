@@ -82,6 +82,11 @@
       contentHtml = temp.innerHTML;
     }
 
+    // Güvenlik: kayıttan önce HTML'i temizle (script/olay-attribute/javascript: temizliği)
+    if (contentHtml && window.__TND_sanitizeHtml) {
+      contentHtml = window.__TND_sanitizeHtml(contentHtml);
+    }
+
     hideFloatButton();
 
     chrome.runtime.sendMessage({
@@ -95,7 +100,7 @@
       }
     }, (response) => {
       if (response && response.success) {
-        showToast('✅ Not deftere aktarıldı!', 'success');
+        showToast(response.duplicate ? '✅ Bu not zaten defterde kayıtlı' : '✅ Not deftere aktarıldı!', 'success');
       } else {
         showToast('❌ Kayıt başarısız oldu', 'error');
       }

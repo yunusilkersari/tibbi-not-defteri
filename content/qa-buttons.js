@@ -164,10 +164,14 @@
     }, (response) => {
       btn.classList.remove('tnd-saving');
       if (response && response.success) {
-        flashSaved(btn);
-        showToast(hasQuestion
-          ? '✅ Soru + cevap deftere aktarıldı!'
-          : '✅ Cevap deftere aktarıldı!', 'success');
+        if (response.duplicate) {
+          showToast('✅ Bu soru-cevap zaten defterde kayıtlı', 'success');
+        } else {
+          flashSaved(btn);
+          showToast(hasQuestion
+            ? '✅ Soru + cevap deftere aktarıldı!'
+            : '✅ Cevap deftere aktarıldı!', 'success');
+        }
       } else {
         showToast('❌ Kayıt başarısız oldu', 'error');
       }

@@ -111,6 +111,11 @@
       contentHtml = temp.innerHTML;
     }
 
+    // Güvenlik: kayıttan önce HTML'i temizle
+    if (contentHtml && window.__TND_sanitizeHtml) {
+      contentHtml = window.__TND_sanitizeHtml(contentHtml);
+    }
+
     chrome.runtime.sendMessage({
       action: 'save-note',
       data: {
@@ -122,7 +127,7 @@
       }
     }, (response) => {
       if (response && response.success) {
-        showToast('✅ Not deftere aktarıldı!', 'success');
+        showToast(response.duplicate ? '✅ Bu not zaten defterde kayıtlı' : '✅ Not deftere aktarıldı!', 'success');
       }
     });
   }
@@ -171,7 +176,7 @@
       }
     }, (response) => {
       if (response && response.success) {
-        showToast('✅ Tam yanıt deftere aktarıldı!', 'success');
+        showToast(response.duplicate ? '✅ Bu yanıt zaten defterde kayıtlı' : '✅ Tam yanıt deftere aktarıldı!', 'success');
       }
     });
   }
@@ -347,7 +352,7 @@
     }, (response) => {
       if (response && response.success) {
         saveBtn.classList.add('tnd-saved');
-        saveBtn.innerHTML = '✓ Kaydedildi';
+        saveBtn.innerHTML = response.duplicate ? '✓ Zaten var' : '✓ Kaydedildi';
         card.classList.add('tnd-saved');
       }
     });
@@ -381,7 +386,9 @@
       }
     }, (response) => {
       if (response && response.success) {
-        showToast(`✅ ${sortedIndexes.length} paragraf tek not olarak aktarıldı!`, 'success');
+        showToast(response.duplicate
+          ? '✅ Bu paragraflar zaten defterde kayıtlı'
+          : `✅ ${sortedIndexes.length} paragraf tek not olarak aktarıldı!`, 'success');
         closeParagraphPanel(overlay, panel);
       }
     });

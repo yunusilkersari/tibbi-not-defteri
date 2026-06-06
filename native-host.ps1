@@ -50,17 +50,29 @@ function Send-Message {
 
 function Save-Notes {
     param($notes)
-    
-    $data = @{
+
+    $count = @($notes).Count
+    $data = [ordered]@{
         app = "Tıbbi Not Defteri"
-        version = "1.0.0"
+        version = "1.1.0"
         savedAt = (Get-Date -Format "o")
-        noteCount = $notes.Count
+        noteCount = $count
         notes = $notes
     }
-    
+
     $json = $data | ConvertTo-Json -Depth 10
-    [System.IO.File]::WriteAllText($dataFile, $json, [System.Text.Encoding]::UTF8)
+    $tmpFile = "$dataFile.tmp"
+    $bakFile = "$dataFile.bak"
+
+    # Önce geçici dosyaya yaz; yarıda kalan yazım ana dosyayı bozmasın
+    [System.IO.File]::WriteAllText($tmpFile, $json, [System.Text.Encoding]::UTF8)
+
+    if (Test-Path $dataFile) {
+        # Atomik değiştir + önceki sürümü .bak olarak sakla (veri kurtarma için)
+        [System.IO.File]::Replace($tmpFile, $dataFile, $bakFile)
+    } else {
+        [System.IO.File]::Move($tmpFile, $dataFile)
+    }
 }
 
 function Load-Notes {

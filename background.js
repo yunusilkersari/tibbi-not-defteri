@@ -59,16 +59,9 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'save-note') {
     saveNote(message.data).then((note) => {
-      sendResponse({ success: true, note });
+      sendResponse({ success: true, note, duplicate: !!(note && note.duplicate) });
     });
     return true; // async response
-  }
-
-  if (message.action === 'save-notes-batch') {
-    saveNotesBatch(message.data).then((notes) => {
-      sendResponse({ success: true, notes });
-    });
-    return true;
   }
 
   if (message.action === 'get-notes') {
@@ -129,6 +122,18 @@ function generateId() {
 }
 
 async function saveNote(data) {
+  const result = await chrome.storage.local.get(['notes']);
+  const notes = result.notes || [];
+
+  // Yinelenen koruması: aynı içerikli not zaten kayıtlıysa yenisini ekleme
+  const newContent = (data.content || '').trim();
+  if (newContent) {
+    const existing = notes.find(n => (n.content || '').trim() === newContent);
+    if (existing) {
+      return { ...existing, duplicate: true };
+    }
+  }
+
   const note = {
     id: generateId(),
     content: data.content || '',
@@ -143,8 +148,6 @@ async function saveNote(data) {
     captureMethod: data.captureMethod || 'manual'
   };
 
-  const result = await chrome.storage.local.get(['notes']);
-  const notes = result.notes || [];
   notes.unshift(note);
   await chrome.storage.local.set({ notes });
 
@@ -153,30 +156,6 @@ async function saveNote(data) {
   autoSaveToDisk();
 
   return note;
-}
-
-async function saveNotesBatch(dataArray) {
-  const notes = dataArray.map(data => ({
-    id: generateId() + Math.random().toString(36).substring(2, 4),
-    content: data.content || '',
-    sourceUrl: data.sourceUrl || '',
-    sourceTitle: data.sourceTitle || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    tags: data.tags || [],
-    isStarred: false,
-    userNote: '',
-    captureMethod: data.captureMethod || 'ai-paragraph'
-  }));
-
-  const result = await chrome.storage.local.get(['notes']);
-  const existingNotes = result.notes || [];
-  const allNotes = [...notes, ...existingNotes];
-  await chrome.storage.local.set({ notes: allNotes });
-
-  updateBadge();
-  autoSaveToDisk();
-  return notes;
 }
 
 async function getNotes(filter = {}) {

@@ -749,6 +749,28 @@ body {
   display: none;
 }
 
+/* "Daha fazla göster" butonu (kademeli liste) */
+.load-more-btn {
+  align-self: center;
+  margin: 8px 0 4px;
+  padding: 10px 22px;
+  background: var(--accent-primary-dim);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--accent-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.load-more-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
 .notes-empty-icon {
   font-size: 56px;
   margin-bottom: 16px;
