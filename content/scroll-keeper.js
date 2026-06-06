@@ -4,8 +4,9 @@
 // sayfanın seni en alta çekmesini engeller / okuduğun yere döndürür.
 // Modlar (preferences.scrollMode): 'lock' | 'button' | 'off'
 //
-// Konteyner, GERÇEK scroll olayının hedefinden (e.target) öğrenilir —
-// böylece Gemini gibi iç içe scroll yapan arayüzlerde de doğru çalışır.
+// - Konteyner, gerçek scroll olayının hedefinden (e.target) öğrenilir.
+// - Konum, okunan MESAJ ELEMANI çapa alınarak korunur (içerik büyüse de kaymaz);
+//   eleman kaybolursa piksel konumuna düşülür.
 // ==========================================
 
 (function () {
@@ -23,10 +24,12 @@
 
   let mode = 'lock';
   let masterEnabled = true;
-  let savedTop = null;        // okuma konumu (yukarıdayken)
+  let savedTop = null;          // piksel yedeği (yukarıdayken)
+  let anchorEl = null;          // okunan mesaj elemanı (çapa)
+  let anchorOffset = 0;         // çapanın konteyner üstüne göre konumu (px)
   let lastUserScroll = 0;
   let restoring = false;
-  let learnedContainer = null; // scroll olaylarından öğrenilen gerçek konteyner
+  let learnedContainer = null;
   let btn = null;
 
   // ==========================================
@@ -41,7 +44,7 @@
     if (area !== 'local' || !changes.preferences) return;
     applyPrefs(changes.preferences.newValue);
     if (mode === 'off' || !masterEnabled) {
-      savedTop = null;
+      clearAnchor();
       hideButton();
     }
   });
@@ -57,43 +60,37 @@
   }
 
   // ==========================================
-  // Scroll yardımcıları (element veya döküman)
+  // Scroll yardımcıları
   // ==========================================
-  function docScroller() {
-    return document.scrollingElement || document.documentElement;
-  }
+  function docScroller() { return document.scrollingElement || document.documentElement; }
   function isDoc(c) {
     return c === document.scrollingElement || c === document.documentElement || c === document.body;
   }
-  function getTop(c) {
-    return isDoc(c) ? (window.scrollY || document.documentElement.scrollTop) : c.scrollTop;
-  }
-  function setTop(c, v) {
-    if (isDoc(c)) window.scrollTo(0, v);
-    else c.scrollTop = v;
-  }
+  function getTop(c) { return isDoc(c) ? (window.scrollY || document.documentElement.scrollTop) : c.scrollTop; }
+  function setTop(c, v) { if (isDoc(c)) window.scrollTo(0, v); else c.scrollTop = v; }
   function maxScroll(c) {
     const sh = isDoc(c) ? document.documentElement.scrollHeight : c.scrollHeight;
     const ch = isDoc(c) ? window.innerHeight : c.clientHeight;
     return sh - ch;
   }
-  function isNearBottom(c) {
-    return maxScroll(c) - getTop(c) < 90;
-  }
+  function isNearBottom(c) { return maxScroll(c) - getTop(c) < 90; }
+  function containerTop(c) { return isDoc(c) ? 0 : c.getBoundingClientRect().top; }
 
   function answerEls() {
     return (window.__TND_AIParser && window.__TND_AIParser.getAnswerElements)
-      ? window.__TND_AIParser.getAnswerElements()
-      : [];
+      ? window.__TND_AIParser.getAnswerElements() : [];
+  }
+  function questionEls() {
+    return (window.__TND_AIParser && window.__TND_AIParser.getQuestionElements)
+      ? window.__TND_AIParser.getQuestionElements() : [];
+  }
+  function messageEls() {
+    return answerEls().concat(questionEls());
   }
 
-  // e.target bir "sohbet" scroller'ı mı? (AI cevabı içeriyor mu)
   function isConversationScroller(c) {
     if (!c) return false;
-    if (isDoc(c)) {
-      // döküman scroller'ı: sayfa kendisi kayıyorsa
-      return maxScroll(c) > 40;
-    }
+    if (isDoc(c)) return maxScroll(c) > 40;
     if (c.nodeType !== 1) return false;
     if (maxScroll(c) < 40) return false;
     const ans = answerEls();
@@ -101,7 +98,6 @@
   }
 
   function rememberContainer(c) {
-    // Element scroller'ı tercih et; döküman scroller'ı yalnızca başka yoksa
     if (isDoc(c)) {
       if (!learnedContainer || !learnedContainer.isConnected) learnedContainer = c;
     } else {
@@ -110,9 +106,7 @@
   }
 
   function container() {
-    if (learnedContainer && (isDoc(learnedContainer) || learnedContainer.isConnected)) {
-      return learnedContainer;
-    }
+    if (learnedContainer && (isDoc(learnedContainer) || learnedContainer.isConnected)) return learnedContainer;
     return guessContainer();
   }
 
@@ -129,18 +123,56 @@
   }
 
   // ==========================================
+  // Çapa (okunan mesaj elemanı)
+  // ==========================================
+  function pickAnchor(c) {
+    const refTop = containerTop(c);
+    let best = null, bestDist = Infinity;
+    messageEls().forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.height === 0) return;
+      // Görünür alanın üstüne en yakın, hâlâ görünen eleman
+      if (r.bottom <= refTop + 4) return;
+      const dist = Math.abs(r.top - refTop);
+      if (dist < bestDist) { bestDist = dist; best = el; }
+    });
+    if (best) {
+      anchorEl = best;
+      anchorOffset = best.getBoundingClientRect().top - refTop;
+    }
+  }
+
+  function restoreByAnchor(c) {
+    if (!anchorEl || !anchorEl.isConnected) return false;
+    const refTop = containerTop(c);
+    const cur = anchorEl.getBoundingClientRect().top - refTop;
+    const delta = cur - anchorOffset;
+    if (Math.abs(delta) > 2) {
+      restoring = true;
+      setTop(c, getTop(c) + delta);
+    }
+    return true;
+  }
+
+  function clearAnchor() {
+    savedTop = null;
+    anchorEl = null;
+  }
+
+  // ==========================================
   // Olaylar
   // ==========================================
-  function onUserScroll() {
-    lastUserScroll = Date.now();
+  function onUserScroll() { lastUserScroll = Date.now(); }
+
+  function isTypingTarget(t) {
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
   }
 
   function onScroll(e) {
     if (!active()) return;
 
     let c = e.target;
-    if (c === document || c === window || !c) c = docScroller();
-    if (c.nodeType === 9) c = docScroller(); // document node
+    if (c === document || c === window || !c || c.nodeType === 9) c = docScroller();
     if (!isConversationScroller(c)) return;
 
     rememberContainer(c);
@@ -148,22 +180,20 @@
     if (restoring) { restoring = false; return; }
 
     const userActive = Date.now() - lastUserScroll < 300;
-    if (userActive) {
-      updateAnchor(c);
-      return;
-    }
+    if (userActive) { updateAnchor(c); return; }
 
     // Programatik (site kaynaklı) kaydırma
-    if (savedTop == null) return;
+    if (savedTop == null && !anchorEl) return;
 
     if (mode === 'lock') {
-      if (getTop(c) > savedTop + 4) {
+      const ok = restoreByAnchor(c);
+      if (!ok && savedTop != null && getTop(c) > savedTop + 4) {
         restoring = true;
         setTop(c, savedTop);
-        showGoBottom();
       }
+      showGoBottom();
     } else if (mode === 'button') {
-      if (isNearBottom(c) && getTop(c) > savedTop + 60) {
+      if (isNearBottom(c) && savedTop != null && getTop(c) > savedTop + 60) {
         showReturn();
       }
     }
@@ -171,10 +201,11 @@
 
   function updateAnchor(c) {
     if (isNearBottom(c)) {
-      savedTop = null;
+      clearAnchor();
       hideButton();
     } else {
       savedTop = getTop(c);
+      pickAnchor(c);
       if (mode === 'lock') showGoBottom();
     }
   }
@@ -198,8 +229,8 @@
     b.innerHTML = '<span class="tnd-scroll-ic">⤓</span> Yeni yanıtlara git';
     b.onclick = () => {
       const c = container();
-      savedTop = null;
-      setTop(c, maxScroll(c) + 200);
+      clearAnchor();
+      setTop(c, maxScroll(c) + 400);
       hideButton();
     };
     b.style.display = 'flex';
@@ -210,7 +241,8 @@
     const b = getButton();
     b.innerHTML = '<span class="tnd-scroll-ic">↩</span> Okuduğun yere dön';
     b.onclick = () => {
-      if (savedTop != null) setTop(container(), savedTop);
+      const c = container();
+      if (!restoreByAnchor(c) && savedTop != null) setTop(c, savedTop);
       hideButton();
     };
     b.style.display = 'flex';
@@ -228,12 +260,13 @@
       window.addEventListener(ev, onUserScroll, { passive: true, capture: true }));
 
     window.addEventListener('keydown', (e) => {
+      // Metin kutusuna yazarken (boşluk/ok dahil) kaydırma sayma
+      if (isTypingTarget(e.target)) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
         onUserScroll();
       }
     }, { capture: true });
 
-    // Tüm scroll olaylarını capture aşamasında yakala (her elemandan)
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
   }
 })();
