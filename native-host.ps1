@@ -73,6 +73,15 @@ function Save-Notes {
     } else {
         [System.IO.File]::Move($tmpFile, $dataFile)
     }
+
+    # Günlük tarihli yedek: data/backups/notlar-YYYY-MM-DD.json
+    # Aynı gün üzerine yazılır; eski günlerin yedekleri korunur, silinmez.
+    $backupDir = Join-Path $dataDir "backups"
+    if (-not (Test-Path $backupDir)) {
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+    }
+    $dayFile = Join-Path $backupDir ("notlar-" + (Get-Date -Format "yyyy-MM-dd") + ".json")
+    [System.IO.File]::WriteAllText($dayFile, $json, [System.Text.Encoding]::UTF8)
 }
 
 function Load-Notes {

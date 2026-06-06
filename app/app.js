@@ -14,7 +14,7 @@
     selectedDate: null,
     calendarYear: new Date().getFullYear(),
     calendarMonth: new Date().getMonth(),
-    activeFilter: 'all',
+    activeFilter: 'today',
     activeTag: null,
     searchQuery: '',
     editingNoteId: null,
@@ -133,6 +133,7 @@
     renderCalendar();
     await refreshAll();
     bindEvents();
+    checkDiskError();
   }
 
   // ==========================================
@@ -197,8 +198,19 @@
 
     // Export/Import
     DOM.exportBtn.addEventListener('click', handleExport);
+    document.getElementById('exportMdBtn').addEventListener('click', handleExportMarkdown);
+    document.getElementById('exportCsvBtn').addEventListener('click', handleExportCSV);
+    document.getElementById('printBtn').addEventListener('click', handlePrint);
     DOM.importBtn.addEventListener('click', () => DOM.importFile.click());
     DOM.importFile.addEventListener('change', handleImport);
+
+    // Yerel kayıt hatası banner'ı
+    document.getElementById('diskErrorClose').addEventListener('click', () => setDiskErrorBanner(false));
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.diskSaveError) {
+        setDiskErrorBanner(!!changes.diskSaveError.newValue);
+      }
+    });
 
     // Edit Modal
     document.getElementById('editModalClose').addEventListener('click', closeEditModal);
@@ -338,6 +350,12 @@
           if (note) openEditModal(note);
         });
       }
+    });
+
+    // Read Modal — Kopyala
+    document.getElementById('readModalCopyBtn').addEventListener('click', () => {
+      const note = state.readModalNotes[state.readingNoteIndex];
+      if (note) copyNoteText(note);
     });
 
     // Read Modal Navigation
@@ -559,6 +577,20 @@
     // Boş durum
     if (notes.length === 0) {
       DOM.notesEmpty.classList.remove('hidden');
+      const emptyTitle = DOM.notesEmpty.querySelector('.notes-empty-title');
+      const emptyText = DOM.notesEmpty.querySelector('.notes-empty-text');
+      const isTodayView = state.activeFilter === 'today' &&
+        !state.searchQuery && !state.selectedDate && !state.activeTag;
+      if (isTodayView) {
+        if (emptyTitle) emptyTitle.textContent = 'Bugün için henüz not yok';
+        if (emptyText) emptyText.innerHTML =
+          'Yeni güne temiz başladınız. Eski notlarınız duruyor — ' +
+          '<strong>Tüm Notlar</strong> filtresinden veya takvimden ulaşabilirsiniz.';
+      } else {
+        if (emptyTitle) emptyTitle.textContent = 'Not bulunamadı';
+        if (emptyText) emptyText.innerHTML =
+          'Bu filtre/aramaya uygun not yok. <strong>Tüm Notlar</strong>’a dönüp tekrar deneyin.';
+      }
       return;
     }
 
@@ -651,6 +683,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
           </button>
           <button class="note-card-action read-btn" data-action="read" title="Oku">📖</button>
+          <button class="note-card-action" data-action="copy" title="Panoya Kopyala">📋</button>
           <button class="note-card-action" data-action="edit" title="Düzenle">✏️</button>
           <button class="note-card-action delete-btn" data-action="delete" title="Sil">🗑️</button>
         </div>
@@ -678,6 +711,9 @@
           break;
         case 'readFullscreen':
           openReadModalFullscreen(note);
+          break;
+        case 'copy':
+          copyNoteText(note, action);
           break;
         case 'edit':
           openEditModal(note);
@@ -1050,6 +1086,134 @@
     }
 
     DOM.importFile.value = '';
+  }
+
+  // ==========================================
+  // Kopyala / Markdown / CSV / Yazdır
+  // ==========================================
+  async function copyNoteText(note, btn) {
+    try {
+      await navigator.clipboard.writeText(note.content || '');
+      showAppToast('📋 Not panoya kopyalandı');
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+      }
+    } catch (e) {
+      showAppToast('❌ Kopyalanamadı', 'error');
+    }
+  }
+
+  function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function dateStamp() {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  async function handleExportMarkdown() {
+    const notes = await getCurrentNoteList();
+    if (!notes.length) { showAppToast('⚠️ Dışa aktarılacak not yok', 'error'); return; }
+
+    const md = notes.map(n => {
+      const d = new Date(n.createdAt);
+      const head = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
+                   ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      let block = `## ${head}\n\n${n.content || ''}\n`;
+      if (n.userNote) block += `\n> 💬 ${n.userNote}\n`;
+      if (n.tags && n.tags.length) block += `\nEtiketler: ${n.tags.map(t => '#' + t).join(' ')}\n`;
+      if (n.sourceUrl) block += `\nKaynak: ${n.sourceTitle || n.sourceUrl} — ${n.sourceUrl}\n`;
+      return block;
+    }).join('\n---\n\n');
+
+    const header = `# Tıbbi Notlar\n\n${notes.length} not • ${new Date().toLocaleString('tr-TR')}\n\n---\n\n`;
+    downloadFile(`tibbi-notlar-${dateStamp()}.md`, header + md, 'text/markdown;charset=utf-8');
+    showAppToast(`📄 ${notes.length} not Markdown olarak indirildi`);
+  }
+
+  async function handleExportCSV() {
+    const notes = await getCurrentNoteList();
+    if (!notes.length) { showAppToast('⚠️ Dışa aktarılacak not yok', 'error'); return; }
+
+    const esc = (v) => `"${(v == null ? '' : String(v)).replace(/"/g, '""')}"`;
+    const rows = [['Tarih', 'Saat', 'Icerik', 'Etiketler', 'KisiselNot', 'Kaynak', 'Yontem']];
+    notes.forEach(n => {
+      const d = new Date(n.createdAt);
+      rows.push([
+        d.toLocaleDateString('tr-TR'),
+        d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        n.content || '',
+        (n.tags || []).join(', '),
+        n.userNote || '',
+        n.sourceUrl || '',
+        CAPTURE_METHODS[n.captureMethod] || n.captureMethod || ''
+      ]);
+    });
+    // UTF-8 BOM — Excel Türkçe karakterleri doğru göstersin
+    const csv = '﻿' + rows.map(r => r.map(esc).join(';')).join('\r\n');
+    downloadFile(`tibbi-notlar-${dateStamp()}.csv`, csv, 'text/csv;charset=utf-8');
+    showAppToast(`📊 ${notes.length} not CSV olarak indirildi`);
+  }
+
+  async function handlePrint() {
+    const notes = await getCurrentNoteList();
+    if (!notes.length) { showAppToast('⚠️ Yazdırılacak not yok', 'error'); return; }
+
+    const win = window.open('', '_blank');
+    if (!win) { showAppToast('⚠️ Açılır pencere engellendi', 'error'); return; }
+
+    const body = notes.map(n => {
+      const d = new Date(n.createdAt);
+      const meta = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
+                   ' · ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const content = n.contentHtml ? n.contentHtml : escapeHtml(n.content || '').replace(/\n/g, '<br>');
+      const tags = (n.tags && n.tags.length) ? `<div class="pt-tags">${n.tags.map(t => '#' + escapeHtml(t)).join(' ')}</div>` : '';
+      const src = n.sourceUrl ? `<div class="pt-src">Kaynak: ${escapeHtml(n.sourceTitle || n.sourceUrl)}</div>` : '';
+      const un = n.userNote ? `<div class="pt-un">💬 ${escapeHtml(n.userNote)}</div>` : '';
+      return `<article class="pt-note"><div class="pt-meta">${meta}</div><div class="pt-content">${content}</div>${un}${tags}${src}</article>`;
+    }).join('');
+
+    win.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Tıbbi Notlar</title>
+      <style>
+        body{font-family:'Segoe UI',Arial,sans-serif;color:#111;max-width:800px;margin:24px auto;padding:0 16px;line-height:1.6;}
+        h1{font-size:22px;border-bottom:2px solid #00a884;padding-bottom:8px;}
+        .pt-note{padding:14px 0;border-bottom:1px solid #ddd;page-break-inside:avoid;}
+        .pt-meta{font-size:12px;color:#00a884;font-weight:600;margin-bottom:6px;}
+        .pt-content img{max-width:100%;height:auto;}
+        .pt-un{margin-top:8px;font-style:italic;color:#555;}
+        .pt-tags{margin-top:6px;font-size:12px;color:#00a884;}
+        .pt-src{margin-top:4px;font-size:11px;color:#888;}
+        @media print{ body{margin:0;} }
+      </style></head><body>
+      <h1>Tıbbi Notlar — ${notes.length} not</h1>
+      ${body}
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
+  }
+
+  // ==========================================
+  // Yerel kayıt hatası uyarısı
+  // ==========================================
+  async function checkDiskError() {
+    try {
+      const r = await chrome.storage.local.get('diskSaveError');
+      setDiskErrorBanner(!!r.diskSaveError);
+    } catch (e) { /* yoksay */ }
+  }
+
+  function setDiskErrorBanner(show) {
+    const banner = document.getElementById('diskErrorBanner');
+    if (banner) banner.classList.toggle('hidden', !show);
   }
 
   // ==========================================

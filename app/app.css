@@ -557,6 +557,63 @@ body {
   color: var(--text-secondary);
 }
 
+.data-action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.data-action-btn-sm {
+  flex: 1;
+  justify-content: center;
+  padding: 7px 8px;
+  font-size: 11px;
+}
+
+/* Yerel kayıt hatası banner'ı */
+.disk-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 28px 0;
+  padding: 11px 16px;
+  background: rgba(255, 159, 67, 0.12);
+  border: 1px solid rgba(255, 159, 67, 0.4);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.disk-error-banner.hidden {
+  display: none;
+}
+
+.disk-error-text strong {
+  color: #ff9f43;
+}
+
+.disk-error-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.disk-error-close:hover {
+  background: rgba(255, 159, 67, 0.18);
+  color: #ff9f43;
+}
+
 /* ==========================================
    MAIN CONTENT
    ========================================== */

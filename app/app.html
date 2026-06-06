@@ -73,13 +73,13 @@
             <span>🏷️ Filtreler</span>
           </div>
           <div class="filter-buttons">
-            <button class="filter-btn active" data-filter="all">
+            <button class="filter-btn" data-filter="all">
               <span class="filter-icon">📋</span> Tüm Notlar
             </button>
             <button class="filter-btn" data-filter="starred">
               <span class="filter-icon">⭐</span> Yıldızlı
             </button>
-            <button class="filter-btn" data-filter="today">
+            <button class="filter-btn active" data-filter="today">
               <span class="filter-icon">📆</span> Bugün
             </button>
           </div>
@@ -122,6 +122,14 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
             JSON İçe Aktar
           </button>
+          <div class="data-action-row">
+            <button class="data-action-btn data-action-btn-sm" id="exportMdBtn" title="Görünen notları Markdown olarak indir">📄 Markdown</button>
+            <button class="data-action-btn data-action-btn-sm" id="exportCsvBtn" title="Görünen notları CSV olarak indir">📊 CSV</button>
+          </div>
+          <button class="data-action-btn" id="printBtn" title="Görünen notları yazdır veya PDF olarak kaydet">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+            Yazdır / PDF
+          </button>
           <input type="file" id="importFile" accept=".json" style="display:none">
         </div>
       </div>
@@ -148,6 +156,12 @@
           </button>
           <span class="topbar-note-count" id="topbarNoteCount">0 not</span>
         </div>
+      </div>
+
+      <!-- Yerel kayıt hatası uyarısı -->
+      <div class="disk-error-banner hidden" id="diskErrorBanner">
+        <span class="disk-error-text">⚠️ Notlar bilgisayara (yerel dosyaya) kaydedilemiyor. Veriler tarayıcıda güvende, ama <strong>data/notlar.json</strong> güncellenmiyor. Native host kurulumunu kontrol edin.</span>
+        <button class="disk-error-close" id="diskErrorClose" title="Kapat">✕</button>
       </div>
 
       <!-- Notes Container -->
@@ -276,6 +290,7 @@
           </button>
         </div>
         <div class="read-modal-actions">
+          <button class="modal-btn modal-btn-secondary" id="readModalCopyBtn" title="Notu panoya kopyala">📋 Kopyala</button>
           <button class="modal-btn modal-btn-secondary" id="readModalEditBtn">✏️ Düzenle</button>
           <button class="modal-btn modal-btn-primary" id="readModalCloseBtn">Kapat</button>
         </div>

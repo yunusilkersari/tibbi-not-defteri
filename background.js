@@ -263,8 +263,12 @@ function autoSaveToDisk() {
         (response) => {
           if (chrome.runtime.lastError) {
             console.warn('Yerel kaydetme bağlantısı yok:', chrome.runtime.lastError.message);
+            chrome.storage.local.set({ diskSaveError: { at: Date.now(), msg: chrome.runtime.lastError.message } });
           } else if (response && response.success) {
             console.log(`✅ ${response.count} not lokale kaydedildi`);
+            chrome.storage.local.set({ diskSaveError: null });
+          } else {
+            chrome.storage.local.set({ diskSaveError: { at: Date.now(), msg: (response && response.error) || 'Bilinmeyen hata' } });
           }
         }
       );
