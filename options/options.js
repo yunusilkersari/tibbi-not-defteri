@@ -62,6 +62,9 @@ chrome.storage.local.get(['customSelectors', 'preferences'], (result) => {
   // Görsel gömme tercihi (varsayılan: açık)
   const prefs = result.preferences || {};
   document.getElementById('embedImages').checked = prefs.embedImages !== false;
+
+  // Kaydırma modu (varsayılan: kilit)
+  document.getElementById('scrollMode').value = prefs.scrollMode || 'lock';
 });
 
 // Kaydet
@@ -77,10 +80,12 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     }
   });
   const embedImages = document.getElementById('embedImages').checked;
+  const scrollMode = document.getElementById('scrollMode').value;
 
   chrome.storage.local.get('preferences', (r) => {
     const prefs = r.preferences || {};
     prefs.embedImages = embedImages;
+    prefs.scrollMode = scrollMode;
     chrome.storage.local.set({ customSelectors: custom, preferences: prefs }, () => {
       showStatus('✅ Kaydedildi. İlgili AI sekmesini yenileyin.');
     });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tıbbi Not Defteri",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Pratisyen hekimler için hızlı tıbbi not yakalama ve düzenleme sistemi",
 
   "permissions": [
@@ -21,7 +21,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js", "content/floating-button.js", "content/ai-parser.js", "content/qa-buttons.js"],
+      "js": ["content/content.js", "content/floating-button.js", "content/ai-parser.js", "content/qa-buttons.js", "content/scroll-keeper.js"],
       "css": ["content/content.css"],
       "run_at": "document_idle"
     }

@@ -160,6 +160,52 @@
 }
 
 /* ==========================================
+   Kaydırma Koruması Butonu
+   ========================================== */
+.tnd-scroll-btn {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  background: linear-gradient(135deg, rgba(15, 17, 23, 0.94), rgba(26, 29, 39, 0.97));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 212, 170, 0.45);
+  border-radius: 22px;
+  color: #e4e4e7;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 212, 170, 0.12);
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.tnd-scroll-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 170, 0.2), rgba(15, 17, 23, 0.96));
+  border-color: rgba(0, 212, 170, 0.7);
+  box-shadow: 0 8px 32px rgba(0, 212, 170, 0.25);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.tnd-scroll-btn:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.tnd-scroll-ic {
+  font-size: 15px;
+  color: #00d4aa;
+}
+
+/* ==========================================
    Toast Notification
    ========================================== */
 .tnd-toast {
