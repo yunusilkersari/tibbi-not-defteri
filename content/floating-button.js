@@ -104,6 +104,12 @@
 
   // Seçim varsa butonu konumlandır/göster
   function updateButtonForSelection() {
+    // Uzantı kapalıysa butonu hiç gösterme
+    if (window.__TND_isEnabled && !window.__TND_isEnabled()) {
+      hideFloatButton();
+      return;
+    }
+
     const selection = window.getSelection();
     const text = selection.toString().trim();
 
@@ -153,6 +159,10 @@
 
   // Toast bildirimi göster (global erişim için)
   window.__TND_showToast = showToast;
+
+  // Kapatılınca bu butonu gizle
+  window.__TND_hideHooks = window.__TND_hideHooks || [];
+  window.__TND_hideHooks.push(hideFloatButton);
 
   function showToast(message, type = 'success') {
     const existing = document.querySelector('.tnd-toast');

@@ -90,6 +90,76 @@
 }
 
 /* ==========================================
+   Soru+Cevap Kaydet Butonu (her AI yanıtının yanında)
+   ========================================== */
+.tnd-qa-btn {
+  position: fixed;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(15, 17, 23, 0.92), rgba(26, 29, 39, 0.96));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 212, 170, 0.4);
+  border-radius: 10px;
+  color: #e4e4e7;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 212, 170, 0.1);
+  opacity: 0;
+  transform: translateY(4px) scale(0.94);
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.tnd-qa-btn.tnd-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.tnd-qa-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 170, 0.18), rgba(15, 17, 23, 0.95));
+  border-color: rgba(0, 212, 170, 0.65);
+  box-shadow:
+    0 8px 28px rgba(0, 212, 170, 0.22),
+    0 0 0 1px rgba(0, 212, 170, 0.3);
+  transform: translateY(-1px) scale(1.03);
+}
+
+.tnd-qa-btn:active {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
+}
+
+.tnd-qa-btn.tnd-saving {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tnd-qa-btn.tnd-saved {
+  background: #00d4aa;
+  border-color: #00d4aa;
+  color: #0f1117;
+}
+
+.tnd-qa-btn-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px rgba(0, 212, 170, 0.5));
+}
+
+.tnd-qa-btn-text {
+  letter-spacing: 0.2px;
+}
+
+/* ==========================================
    Toast Notification
    ========================================== */
 .tnd-toast {

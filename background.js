@@ -19,8 +19,9 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Context menu tıklandığında
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'save-to-notebook' && info.selectionText) {
+    if (await isDisabled()) return; // uzantı kapalıysa kaydetme
     saveNote({
       content: info.selectionText,
       sourceUrl: tab.url,
@@ -30,8 +31,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+// Uzantı kullanıcı tarafından kapatılmış mı? (preferences.enabled === false)
+async function isDisabled() {
+  const result = await chrome.storage.local.get('preferences');
+  return !!(result.preferences && result.preferences.enabled === false);
+}
+
 // Klavye kısayolları
-chrome.commands.onCommand.addListener((command, tab) => {
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (await isDisabled()) return; // uzantı kapalıysa kısayolları yok say
   if (command === 'capture-selection') {
     // Alt+Q: Seçili metni yakala
     chrome.tabs.sendMessage(tab.id, { action: 'capture-selection' });
@@ -41,6 +49,9 @@ chrome.commands.onCommand.addListener((command, tab) => {
   } else if (command === 'capture-full-response') {
     // Alt+2: Son AI yanıtının tamamını aktar
     chrome.tabs.sendMessage(tab.id, { action: 'capture-full-response' });
+  } else if (command === 'capture-qa') {
+    // Alt+3: Okunan cevabı sorusuyla birlikte aktar
+    chrome.tabs.sendMessage(tab.id, { action: 'capture-qa' });
   }
 });
 

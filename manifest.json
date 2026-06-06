@@ -18,7 +18,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js", "content/floating-button.js", "content/ai-parser.js"],
+      "js": ["content/content.js", "content/floating-button.js", "content/ai-parser.js", "content/qa-buttons.js"],
       "css": ["content/content.css"],
       "run_at": "document_idle"
     }
@@ -59,6 +59,12 @@
         "default": "Alt+2"
       },
       "description": "Son AI yanıtının tamamını deftere aktar"
+    },
+    "capture-qa": {
+      "suggested_key": {
+        "default": "Alt+3"
+      },
+      "description": "Okunan cevabı sorusuyla birlikte deftere aktar"
     }
   }
 }

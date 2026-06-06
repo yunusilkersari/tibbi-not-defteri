@@ -12,6 +12,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Tema yükle
   await loadTheme();
 
+  // Aç/Kapa durumunu yükle ve anahtarı bağla
+  await loadEnabled();
+  const enableToggle = document.getElementById('enableToggle');
+  enableToggle.addEventListener('change', () => {
+    const enabled = enableToggle.checked;
+    applyEnabledUI(enabled);
+    chrome.storage.local.get('preferences', (result) => {
+      const prefs = result.preferences || {};
+      prefs.enabled = enabled;
+      chrome.storage.local.set({ preferences: prefs });
+    });
+  });
+
   // İstatistikleri yükle
   await loadStats();
 
@@ -144,6 +157,25 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+async function loadEnabled() {
+  try {
+    const result = await chrome.storage.local.get('preferences');
+    const prefs = result.preferences || {};
+    const enabled = prefs.enabled !== false; // varsayılan: açık
+    document.getElementById('enableToggle').checked = enabled;
+    applyEnabledUI(enabled);
+  } catch (e) {
+    applyEnabledUI(true);
+  }
+}
+
+function applyEnabledUI(enabled) {
+  const power = document.getElementById('popupPower');
+  const label = document.getElementById('powerLabel');
+  power.classList.toggle('off', !enabled);
+  label.textContent = enabled ? 'Uzantı Aktif' : 'Uzantı Kapalı';
 }
 
 async function loadTheme() {

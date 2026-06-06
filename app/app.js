@@ -44,6 +44,7 @@
     'shortcut-alt2-full': 'Alt+2',
     'ai-paragraph': 'AI Paragraf',
     'ai-paragraph-batch': 'AI Toplu',
+    'ai-qa': 'Soru+Cevap',
     'quick-note': 'Hızlı Not',
     'manual': 'Manuel'
   };
@@ -788,9 +789,17 @@
 
   // Direkt tam ekranda okuma
   async function openReadModalFullscreen(note) {
+    // Tam ekranı kullanıcı tıklaması HÂLÂ aktifken, modal açılmadan iste.
+    // Böylece önce pencere modu sonra fullscreen "çift açılım" olmaz —
+    // modal doğrudan tam ekranda bir kez açılır (pürüzsüz geçiş).
+    try {
+      await document.documentElement.requestFullscreen();
+      state.readModalFullscreen = true;
+      updateFullscreenIcon(true);
+    } catch (e) {
+      // Tam ekran reddedilirse normal pencere modunda aç
+    }
     await openReadModal(note);
-    // Kısa gecikme ile tam ekrana geç (modal render olduktan sonra)
-    setTimeout(() => enterReadFullscreen(), 100);
   }
 
   // Ok tuşlarıyla scroll için modal body'ye odaklan
@@ -806,6 +815,9 @@
       }
       requestAnimationFrame(() => {
         mb.focus({ preventScroll: true });
+        // Odaktan SONRA en üste al — odaklanma kaydırmayı geri kaçırmasın
+        mb.scrollTop = 0;
+        if (content) content.scrollTop = 0;
       });
     }
   }

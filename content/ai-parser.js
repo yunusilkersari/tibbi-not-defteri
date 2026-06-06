@@ -14,6 +14,7 @@
       hostname: ['gemini.google.com'],
       responseSelector: 'message-content.model-response-text',
       fallbackSelector: '.response-container .markdown, .model-response-text, [data-message-author-role="model"]',
+      userSelector: 'user-query .query-text, .query-text, [data-message-author-role="user"]',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // OpenAI ChatGPT
@@ -21,6 +22,7 @@
       hostname: ['chat.openai.com', 'chatgpt.com'],
       responseSelector: '[data-message-author-role="assistant"] .markdown',
       fallbackSelector: '.agent-turn .markdown, .text-message .markdown',
+      userSelector: '[data-message-author-role="user"] .whitespace-pre-wrap, [data-message-author-role="user"]',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // Anthropic Claude
@@ -28,6 +30,7 @@
       hostname: ['claude.ai'],
       responseSelector: '[data-is-streaming="false"] .font-claude-message, .font-claude-message',
       fallbackSelector: '.prose, .claude-message',
+      userSelector: '[data-testid="user-message"], .font-user-message',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // xAI Grok
@@ -35,6 +38,7 @@
       hostname: ['grok.com', 'x.com'],
       responseSelector: '[data-testid="message-text"], [data-testid="assistantMessage"], .message-bubble .markdown, .message-text .markdown',
       fallbackSelector: '.markdown, .prose, .response-content, article .break-words, [class*="message"] [class*="markdown"], [class*="response"] p',
+      userSelector: '[data-testid="user-message"], .items-end .message-bubble, [class*="user"] .message-bubble',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // Microsoft Copilot
@@ -42,6 +46,7 @@
       hostname: ['copilot.microsoft.com'],
       responseSelector: '.ac-textBlock, cib-message-group[source="bot"] .ac-textBlock',
       fallbackSelector: '[data-content]',
+      userSelector: 'cib-message-group[source="user"] .ac-textBlock, [data-author="user"]',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // Perplexity
@@ -49,6 +54,7 @@
       hostname: ['www.perplexity.ai', 'perplexity.ai'],
       responseSelector: '.prose .markdown',
       fallbackSelector: '.prose',
+      userSelector: '[class*="query"], h1.group\\/query',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote, table'
     },
     // Generic fallback - herhangi bir sayfa
@@ -56,9 +62,15 @@
       hostname: [],
       responseSelector: '.markdown, .prose, [class*="markdown"], [class*="response"], [class*="answer"], [class*="message-content"], article',
       fallbackSelector: 'main, #content, .content, [role="main"]',
+      userSelector: '[data-message-author-role="user"], [data-testid="user-message"]',
       paragraphSelector: 'p, li, pre, h1, h2, h3, h4, h5, h6, blockquote'
     }
   };
+
+  // Platform seçicisi başarısız olduğunda denenecek genel kullanıcı-mesajı seçicileri
+  const GENERIC_USER_SELECTOR =
+    '[data-message-author-role="user"], [data-testid="user-message"], .font-user-message, ' +
+    'user-query .query-text, .query-text';
 
   /**
    * Mevcut sayfanın hangi AI platformuna ait olduğunu belirle
@@ -170,6 +182,130 @@
   }
 
   /**
+   * Belirli bir cevap elementinden hemen önce gelen kullanıcı sorusunu bul.
+   * Önce platforma özel seçici, bulunamazsa genel seçiciler denenir.
+   * Doküman sırasında cevaptan önce gelen son kullanıcı mesajı = ilgili soru.
+   */
+  function findQuestionFor(answerEl, platform) {
+    const selectors = [platform.userSelector, GENERIC_USER_SELECTOR].filter(Boolean);
+    for (const sel of selectors) {
+      let best = null;
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(sel);
+      } catch (e) {
+        continue;
+      }
+      nodes.forEach((u) => {
+        // Cevabın içindeki/iç içe geçmiş elemanları atla
+        if (u === answerEl || u.contains(answerEl) || answerEl.contains(u)) return;
+        const pos = answerEl.compareDocumentPosition(u);
+        if (pos & Node.DOCUMENT_POSITION_PRECEDING) {
+          best = u; // doküman sırasında en son "önceki" = en yakın soru
+        }
+      });
+      if (best) {
+        const text = cleanQuestionText(best.textContent);
+        if (text) return text;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Kullanıcı mesajının başındaki gizli (ekran okuyucu) arayüz etiketlerini at.
+   * Ör. ChatGPT'nin "Siz şunu dediniz:" / "You said:" sr-only etiketi.
+   */
+  function cleanQuestionText(text) {
+    if (!text) return '';
+    let t = text.trim();
+    const prefixes = [
+      'Siz şunu dediniz:', 'Siz şunu dediniz',
+      'You said:', 'You said',
+      'Şunu dediniz:', 'Sen dedin ki:',
+      'Sen:', 'Siz:'
+    ];
+    for (const p of prefixes) {
+      if (t.toLowerCase().startsWith(p.toLowerCase())) {
+        t = t.slice(p.length).trim();
+        break;
+      }
+    }
+    return t;
+  }
+
+  /**
+   * Bir cevap elementinden Soru + Cevap paketi oluştur.
+   * Sohbet içindeki herhangi bir AI yanıtının yanındaki butondan çağrılır.
+   */
+  function buildQA(answerEl) {
+    if (!answerEl) return null;
+    const platform = detectPlatform();
+    const questionText = findQuestionFor(answerEl, platform);
+
+    // Resimleri mutlak URL'ye çevir
+    const clone = answerEl.cloneNode(true);
+    clone.querySelectorAll('img').forEach((img) => {
+      if (img.src) img.setAttribute('src', img.src);
+    });
+
+    return {
+      questionText,
+      answerText: answerEl.textContent.trim(),
+      answerHtml: cleanHtml(clone.innerHTML),
+      platform: platform.name,
+      sourceUrl: window.location.href,
+      sourceTitle: document.title
+    };
+  }
+
+  /**
+   * Sayfadaki tüm AI cevap elementlerini doküman sırasıyla döndür.
+   * Her cevabın yanına "kaydet" butonu iliştirmek için kullanılır.
+   */
+  function getAnswerElements() {
+    const platform = detectPlatform();
+    let els = document.querySelectorAll(platform.responseSelector);
+    if (els.length === 0 && platform.fallbackSelector) {
+      els = document.querySelectorAll(platform.fallbackSelector);
+    }
+    return Array.from(els);
+  }
+
+  /**
+   * Sayfadaki tüm kullanıcı sorusu elementlerini döndür.
+   * İç içe eşleşmelerde en içteki (asıl metni taşıyan) element tutulur,
+   * böylece her soru için tek bir buton ankrajı kalır.
+   */
+  function getQuestionElements() {
+    const platform = detectPlatform();
+    const selectors = [platform.userSelector, GENERIC_USER_SELECTOR].filter(Boolean);
+    let arr = [];
+    for (const sel of selectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(sel));
+        if (found.length) { arr = found; break; }
+      } catch (e) { /* geçersiz seçici, sonrakini dene */ }
+    }
+    // İç içe geçenleri ele: başka bir eşleşmeyi içeren atalar düşürülür
+    return arr.filter(el => !arr.some(other => other !== el && el.contains(other)));
+  }
+
+  /**
+   * Belirli bir sorudan hemen sonra gelen ilk AI cevabını bul.
+   */
+  function findAnswerFor(questionEl) {
+    if (!questionEl) return null;
+    const answers = getAnswerElements(); // doküman sırasında
+    for (const a of answers) {
+      if (a === questionEl || a.contains(questionEl) || questionEl.contains(a)) continue;
+      const pos = questionEl.compareDocumentPosition(a);
+      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return a;
+    }
+    return null;
+  }
+
+  /**
    * HTML'i temizle — gereksiz boşlukları, script/style etiketlerini kaldır
    */
   function cleanHtml(html) {
@@ -188,6 +324,11 @@
     detectPlatform,
     findLastResponse,
     parseResponseToParagraphs,
-    getFullResponse
+    getFullResponse,
+    findQuestionFor,
+    buildQA,
+    getAnswerElements,
+    getQuestionElements,
+    findAnswerFor
   };
 })();

@@ -7,9 +7,44 @@
   'use strict';
 
   // ==========================================
+  // Aç/Kapa durumu — diğer içerik scriptleri de bunu kullanır
+  // (window.__TND_isEnabled). Varsayılan: açık.
+  // ==========================================
+  let __tndEnabled = true;
+  window.__TND_isEnabled = () => __tndEnabled;
+
+  // Kapatıldığında çağrılacak gizleme kancaları (her script kendi gizleyicisini ekler)
+  window.__TND_hideHooks = window.__TND_hideHooks || [];
+  window.__TND_hideAllButtons = () => {
+    window.__TND_hideHooks.forEach((fn) => { try { fn(); } catch (e) { /* yoksay */ } });
+  };
+
+  chrome.storage.local.get('preferences', (result) => {
+    const prefs = result.preferences || {};
+    __tndEnabled = prefs.enabled !== false;
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.preferences) {
+      const prefs = changes.preferences.newValue || {};
+      __tndEnabled = prefs.enabled !== false;
+      // Kapatıldıysa sayfadaki butonları hemen gizle
+      if (!__tndEnabled && typeof window.__TND_hideAllButtons === 'function') {
+        window.__TND_hideAllButtons();
+      }
+    }
+  });
+
+  // ==========================================
   // Background'dan gelen mesajları dinle
   // ==========================================
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Uzantı kapalıysa kısayol/menü tetiklerini yok say
+    if (!__tndEnabled) {
+      sendResponse({ success: false, disabled: true });
+      return true;
+    }
+
     switch (message.action) {
       case 'capture-selection':
         handleCaptureSelection();
@@ -25,9 +60,30 @@
         handleCaptureFullResponse();
         sendResponse({ success: true });
         break;
+
+      case 'capture-qa':
+        handleCaptureQA();
+        sendResponse({ success: true });
+        break;
     }
     return true;
   });
+
+  // ==========================================
+  // Alt+3: O an okunan cevabı sorusuyla birlikte aktar
+  // ==========================================
+  function handleCaptureQA() {
+    if (!window.__TND_QA) {
+      showToast('⚠️ Bu sayfada Soru+Cevap kaydı desteklenmiyor', 'error');
+      return;
+    }
+    const answer = window.__TND_QA.getMostVisibleAnswer();
+    if (!answer) {
+      showToast('⚠️ Ekranda bir AI cevabı bulunamadı', 'error');
+      return;
+    }
+    window.__TND_QA.saveAnswer(answer);
+  }
 
   // ==========================================
   // Alt+Q: Seçili metni deftere aktar

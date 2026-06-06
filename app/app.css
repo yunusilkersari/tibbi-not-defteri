@@ -1521,6 +1521,25 @@ body {
   display: flex !important;
 }
 
+/* Tam ekranda üst ve alt çubuğu boyca kısalt (daha fazla okuma alanı) */
+:fullscreen #readModal .read-modal .modal-header,
+:-webkit-full-screen #readModal .read-modal .modal-header {
+  padding: 9px 24px;
+}
+
+:fullscreen #readModal .read-modal .modal-footer,
+:-webkit-full-screen #readModal .read-modal .modal-footer {
+  padding: 7px 24px;
+}
+
+:fullscreen #readModal .read-modal .modal-footer .modal-btn,
+:-webkit-full-screen #readModal .read-modal .modal-footer .modal-btn,
+:fullscreen #readModal .read-modal .modal-footer .modal-btn-nav,
+:-webkit-full-screen #readModal .read-modal .modal-footer .modal-btn-nav {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 /* Root fullscreen olduğunda arka planı ve sidebar'ı gizle */
 :fullscreen .app-layout,
 :-webkit-full-screen .app-layout {
@@ -1560,23 +1579,30 @@ body {
 
 .width-slider-panel {
   display: none;
+  /* Yüzen flyout: düzeni itmez, böylece toggle simgesi yerinde kalır */
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
   align-items: center;
   gap: 8px;
-  margin-left: 8px;
-  padding: 4px 10px;
-  background: var(--bg-tertiary);
+  padding: 6px 12px;
+  background: var(--bg-elevated);
   border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  animation: sliderFadeIn 0.2s ease;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  z-index: 10;
+  transform: translateY(-50%);
 }
 
 .width-slider-panel.open {
   display: flex;
+  animation: sliderFlyIn 0.2s ease;
 }
 
-@keyframes sliderFadeIn {
-  from { opacity: 0; transform: translateX(-5px); }
-  to { opacity: 1; transform: translateX(0); }
+@keyframes sliderFlyIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-6px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .width-slider {
