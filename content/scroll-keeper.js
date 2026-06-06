@@ -1,12 +1,13 @@
 // ==========================================
-// Tıbbi Not Defteri - Kaydırma Koruması
-// AI sohbetinde yukarıdaki bir yanıtı okurken yeni mesaj gönderince
-// sayfanın seni en alta çekmesini engeller / okuduğun yere döndürür.
-// Modlar (preferences.scrollMode): 'lock' | 'button' | 'off'
+// Tıbbi Not Defteri - Kaydırma Koruması (Kilit)
+// AI sohbetinde yukarıdaki bir yanıtı okurken, yeni mesaj/akış sırasında
+// sayfanın seni en alta çekmesini engeller. Senin kendi kaydırman
+// (fare tekeri, kaydırma çubuğu, klavye) HER ZAMAN serbesttir.
 //
-// - Konteyner, gerçek scroll olayının hedefinden (e.target) öğrenilir.
-// - Konum, okunan MESAJ ELEMANI çapa alınarak korunur (içerik büyüse de kaymaz);
-//   eleman kaybolursa piksel konumuna düşülür.
+// Mantık: Sitenin "alta çekmesi", içerik o an büyürken (streaming) gelen
+// ve aşağı yönlü olan kaydırmadır. Bunu MutationObserver ile ayırt edip
+// yalnızca onu geri alırız; diğer tüm kaydırmalar kullanıcıya aittir.
+// Mod (preferences.scrollMode): 'lock' | 'off'
 // ==========================================
 
 (function () {
@@ -22,15 +23,21 @@
   ];
   if (!AI_HOSTS.some(h => window.location.hostname.includes(h))) return;
 
-  let mode = 'lock';
+  let mode = 'lock';            // 'lock' | 'off'
   let masterEnabled = true;
-  let savedTop = null;          // piksel yedeği (yukarıdayken)
+  let savedTop = null;          // okuma konumu (piksel)
   let anchorEl = null;          // okunan mesaj elemanı (çapa)
-  let anchorOffset = 0;         // çapanın konteyner üstüne göre konumu (px)
-  let lastUserScroll = 0;
+  let anchorOffset = 0;
+  let lastUserScroll = 0;       // wheel/touch/klavye zamanı
+  let lastMutation = 0;         // içerik son ne zaman büyüdü (streaming)
   let restoring = false;
   let learnedContainer = null;
+  let observer = null;
+  let observedTarget = null;
   let btn = null;
+
+  const USER_WINDOW = 300;      // ms
+  const STREAM_WINDOW = 450;    // ms
 
   // ==========================================
   // Tercihler
@@ -51,13 +58,11 @@
 
   function applyPrefs(prefs) {
     const p = prefs || {};
-    mode = p.scrollMode || 'lock';
+    mode = (p.scrollMode === 'off') ? 'off' : 'lock'; // 'button' eski değeri de kilit say
     masterEnabled = p.enabled !== false;
   }
 
-  function active() {
-    return masterEnabled && mode !== 'off';
-  }
+  function active() { return masterEnabled && mode === 'lock'; }
 
   // ==========================================
   // Scroll yardımcıları
@@ -84,9 +89,7 @@
     return (window.__TND_AIParser && window.__TND_AIParser.getQuestionElements)
       ? window.__TND_AIParser.getQuestionElements() : [];
   }
-  function messageEls() {
-    return answerEls().concat(questionEls());
-  }
+  function messageEls() { return answerEls().concat(questionEls()); }
 
   function isConversationScroller(c) {
     if (!c) return false;
@@ -99,13 +102,9 @@
 
   const instantApplied = new WeakSet();
   function forceInstantScroll(c) {
-    // Yumuşak (animasyonlu) kaydırmayı kapat -> kilit sırasında salınım/parlama azalır
-    if (mode !== 'lock' || !c || !c.style) return;
+    if (!active() || !c || !c.style) return;
     try {
-      if (!instantApplied.has(c)) {
-        c.style.scrollBehavior = 'auto';
-        instantApplied.add(c);
-      }
+      if (!instantApplied.has(c)) { c.style.scrollBehavior = 'auto'; instantApplied.add(c); }
     } catch (e) { /* yoksay */ }
   }
 
@@ -116,6 +115,7 @@
       learnedContainer = c;
     }
     forceInstantScroll(c);
+    ensureObserver();
   }
 
   function container() {
@@ -136,6 +136,20 @@
   }
 
   // ==========================================
+  // İçerik büyümesini izle (streaming tespiti)
+  // ==========================================
+  function ensureObserver() {
+    let target = (learnedContainer && !isDoc(learnedContainer) && learnedContainer.isConnected)
+      ? learnedContainer
+      : (document.querySelector('main') || document.body);
+    if (!target || target === observedTarget) return;
+    if (observer) observer.disconnect();
+    observedTarget = target;
+    observer = new MutationObserver(() => { lastMutation = Date.now(); });
+    observer.observe(target, { childList: true, subtree: true, characterData: true });
+  }
+
+  // ==========================================
   // Çapa (okunan mesaj elemanı)
   // ==========================================
   function pickAnchor(c) {
@@ -143,9 +157,7 @@
     let best = null, bestDist = Infinity;
     messageEls().forEach((el) => {
       const r = el.getBoundingClientRect();
-      if (r.height === 0) return;
-      // Görünür alanın üstüne en yakın, hâlâ görünen eleman
-      if (r.bottom <= refTop + 4) return;
+      if (r.height === 0 || r.bottom <= refTop + 4) return;
       const dist = Math.abs(r.top - refTop);
       if (dist < bestDist) { bestDist = dist; best = el; }
     });
@@ -164,23 +176,23 @@
       restoring = true;
       setTop(c, getTop(c) + delta);
     }
+    savedTop = getTop(c);
     return true;
   }
 
-  function clearAnchor() {
-    savedTop = null;
-    anchorEl = null;
-  }
+  function clearAnchor() { savedTop = null; anchorEl = null; }
 
   // ==========================================
-  // Olaylar
+  // Kullanıcı niyeti (wheel/touch/klavye) — yardımcı sinyal
   // ==========================================
   function onUserScroll() { lastUserScroll = Date.now(); }
-
   function isTypingTarget(t) {
     return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
   }
 
+  // ==========================================
+  // Ana scroll işleyici
+  // ==========================================
   function onScroll(e) {
     if (!active()) return;
 
@@ -192,24 +204,23 @@
 
     if (restoring) { restoring = false; return; }
 
-    const userActive = Date.now() - lastUserScroll < 300;
-    if (userActive) { updateAnchor(c); return; }
+    const userActive = Date.now() - lastUserScroll < USER_WINDOW;
+    const streaming = Date.now() - lastMutation < STREAM_WINDOW;
 
-    // Programatik (site kaynaklı) kaydırma
-    if (savedTop == null && !anchorEl) return;
-
-    if (mode === 'lock') {
+    // Sitenin akış sırasında ALTA çekmesi mi? (kullanıcı tetiklemediyse ve aşağı yönlüyse)
+    if (!userActive && streaming && savedTop != null && getTop(c) > savedTop + 24) {
       const ok = restoreByAnchor(c);
-      if (!ok && savedTop != null && getTop(c) > savedTop + 4) {
+      if (!ok && getTop(c) > savedTop + 4) {
         restoring = true;
         setTop(c, savedTop);
+        savedTop = getTop(c);
       }
       showGoBottom();
-    } else if (mode === 'button') {
-      if (isNearBottom(c) && savedTop != null && getTop(c) > savedTop + 60) {
-        showReturn();
-      }
+      return;
     }
+
+    // Diğer tüm kaydırmalar kullanıcıya aittir → çapayı güncelle (scrollbar dahil serbest)
+    updateAnchor(c);
   }
 
   function updateAnchor(c) {
@@ -219,12 +230,12 @@
     } else {
       savedTop = getTop(c);
       pickAnchor(c);
-      if (mode === 'lock') showGoBottom();
+      showGoBottom();
     }
   }
 
   // ==========================================
-  // Yüzen buton
+  // "Yeni yanıtlara git" butonu
   // ==========================================
   function getButton() {
     if (btn) return btn;
@@ -237,7 +248,7 @@
   }
 
   function showGoBottom() {
-    if (mode !== 'lock' || !active()) return;
+    if (!active()) return;
     const b = getButton();
     b.innerHTML = '<span class="tnd-scroll-ic">⤓</span> Yeni yanıtlara git';
     b.onclick = () => {
@@ -249,21 +260,7 @@
     b.style.display = 'flex';
   }
 
-  function showReturn() {
-    if (mode !== 'button' || !active()) return;
-    const b = getButton();
-    b.innerHTML = '<span class="tnd-scroll-ic">↩</span> Okuduğun yere dön';
-    b.onclick = () => {
-      const c = container();
-      if (!restoreByAnchor(c) && savedTop != null) setTop(c, savedTop);
-      hideButton();
-    };
-    b.style.display = 'flex';
-  }
-
-  function hideButton() {
-    if (btn) btn.style.display = 'none';
-  }
+  function hideButton() { if (btn) btn.style.display = 'none'; }
 
   // ==========================================
   // Başlat
@@ -273,7 +270,6 @@
       window.addEventListener(ev, onUserScroll, { passive: true, capture: true }));
 
     window.addEventListener('keydown', (e) => {
-      // Metin kutusuna yazarken (boşluk/ok dahil) kaydırma sayma
       if (isTypingTarget(e.target)) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
         onUserScroll();
@@ -281,5 +277,6 @@
     }, { capture: true });
 
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    ensureObserver();
   }
 })();
