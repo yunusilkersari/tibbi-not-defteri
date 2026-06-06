@@ -1,12 +1,14 @@
 // ==========================================
 // Tıbbi Not Defteri - Kaydırma Koruması (Kilit)
 // AI sohbetinde yukarıdaki bir yanıtı okurken, yeni mesaj/akış sırasında
-// sayfanın seni en alta çekmesini engeller. Senin kendi kaydırman
-// (fare tekeri, kaydırma çubuğu, klavye) HER ZAMAN serbesttir.
+// sayfanın seni en alta çekmesini engeller.
 //
-// Mantık: Sitenin "alta çekmesi", içerik o an büyürken (streaming) gelen
-// ve aşağı yönlü olan kaydırmadır. Bunu MutationObserver ile ayırt edip
-// yalnızca onu geri alırız; diğer tüm kaydırmalar kullanıcıya aittir.
+// Yaklaşım:
+//  - "Akış" (içerik o an büyüyor) MutationObserver ile saptanır.
+//  - Akış sırasında ve sen dokunmuyorken: her karede (rAF) konum çapaya sabitlenir
+//    -> zamanlama kaçığı olmaz, site seni aşağı çekemez.
+//  - Akış yokken: tüm kaydırman (fare tekeri, kaydırma çubuğu, klavye) serbesttir.
+//  - Çapa yalnızca SEN bilerek dibe inince temizlenir; site kaydırması temizlemez.
 // Mod (preferences.scrollMode): 'lock' | 'off'
 // ==========================================
 
@@ -23,21 +25,22 @@
   ];
   if (!AI_HOSTS.some(h => window.location.hostname.includes(h))) return;
 
-  let mode = 'lock';            // 'lock' | 'off'
+  let mode = 'lock';
   let masterEnabled = true;
-  let savedTop = null;          // okuma konumu (piksel)
-  let anchorEl = null;          // okunan mesaj elemanı (çapa)
+  let savedTop = null;
+  let anchorEl = null;
   let anchorOffset = 0;
-  let lastUserScroll = 0;       // wheel/touch/klavye zamanı
-  let lastMutation = 0;         // içerik son ne zaman büyüdü (streaming)
+  let lastUserScroll = 0;
+  let lastMutation = 0;
   let restoring = false;
+  let holding = false;
   let learnedContainer = null;
   let observer = null;
   let observedTarget = null;
   let btn = null;
 
-  const USER_WINDOW = 300;      // ms
-  const STREAM_WINDOW = 450;    // ms
+  const USER_WINDOW = 250;
+  const STREAM_WINDOW = 1000;
 
   // ==========================================
   // Tercihler
@@ -46,22 +49,16 @@
     applyPrefs(r.preferences);
     start();
   });
-
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.preferences) return;
     applyPrefs(changes.preferences.newValue);
-    if (mode === 'off' || !masterEnabled) {
-      clearAnchor();
-      hideButton();
-    }
+    if (!active()) { clearAnchor(); hideButton(); }
   });
-
   function applyPrefs(prefs) {
     const p = prefs || {};
-    mode = (p.scrollMode === 'off') ? 'off' : 'lock'; // 'button' eski değeri de kilit say
+    mode = (p.scrollMode === 'off') ? 'off' : 'lock';
     masterEnabled = p.enabled !== false;
   }
-
   function active() { return masterEnabled && mode === 'lock'; }
 
   // ==========================================
@@ -117,12 +114,10 @@
     forceInstantScroll(c);
     ensureObserver();
   }
-
   function container() {
     if (learnedContainer && (isDoc(learnedContainer) || learnedContainer.isConnected)) return learnedContainer;
     return guessContainer();
   }
-
   function guessContainer() {
     const ans = answerEls();
     let ref = ans.length ? ans[ans.length - 1] : (document.querySelector('main') || document.body);
@@ -136,7 +131,7 @@
   }
 
   // ==========================================
-  // İçerik büyümesini izle (streaming tespiti)
+  // Akış (içerik büyümesi) izleme
   // ==========================================
   function ensureObserver() {
     let target = (learnedContainer && !isDoc(learnedContainer) && learnedContainer.isConnected)
@@ -145,12 +140,15 @@
     if (!target || target === observedTarget) return;
     if (observer) observer.disconnect();
     observedTarget = target;
-    observer = new MutationObserver(() => { lastMutation = Date.now(); });
+    observer = new MutationObserver(() => {
+      lastMutation = Date.now();
+      if (savedTop != null) startHold();
+    });
     observer.observe(target, { childList: true, subtree: true, characterData: true });
   }
 
   // ==========================================
-  // Çapa (okunan mesaj elemanı)
+  // Çapa
   // ==========================================
   function pickAnchor(c) {
     const refTop = containerTop(c);
@@ -166,7 +164,6 @@
       anchorOffset = best.getBoundingClientRect().top - refTop;
     }
   }
-
   function restoreByAnchor(c) {
     if (!anchorEl || !anchorEl.isConnected) return false;
     const refTop = containerTop(c);
@@ -179,59 +176,67 @@
     savedTop = getTop(c);
     return true;
   }
-
+  function setAnchor(c) {
+    savedTop = getTop(c);
+    pickAnchor(c);
+    showGoBottom();
+  }
   function clearAnchor() { savedTop = null; anchorEl = null; }
 
   // ==========================================
-  // Kullanıcı niyeti (wheel/touch/klavye) — yardımcı sinyal
+  // Akış boyunca her karede konumu sabit tut (rAF)
+  // ==========================================
+  function startHold() {
+    if (holding || !active() || savedTop == null) return;
+    holding = true;
+    requestAnimationFrame(holdLoop);
+  }
+  function holdLoop() {
+    if (!active() || savedTop == null) { holding = false; return; }
+    const streaming = Date.now() - lastMutation < STREAM_WINDOW;
+    const userActive = Date.now() - lastUserScroll < USER_WINDOW;
+    if (!streaming || userActive) { holding = false; return; }
+    const c = container();
+    const ok = restoreByAnchor(c);
+    if (!ok && getTop(c) > savedTop + 4) {
+      restoring = true;
+      setTop(c, savedTop);
+      savedTop = getTop(c);
+    }
+    showGoBottom();
+    requestAnimationFrame(holdLoop);
+  }
+
+  // ==========================================
+  // Kullanıcı niyeti
   // ==========================================
   function onUserScroll() { lastUserScroll = Date.now(); }
   function isTypingTarget(t) {
     return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
   }
 
-  // ==========================================
-  // Ana scroll işleyici
-  // ==========================================
   function onScroll(e) {
     if (!active()) return;
-
     let c = e.target;
     if (c === document || c === window || !c || c.nodeType === 9) c = docScroller();
     if (!isConversationScroller(c)) return;
 
     rememberContainer(c);
-
     if (restoring) { restoring = false; return; }
 
     const userActive = Date.now() - lastUserScroll < USER_WINDOW;
     const streaming = Date.now() - lastMutation < STREAM_WINDOW;
 
-    // Sitenin akış sırasında ALTA çekmesi mi? (kullanıcı tetiklemediyse ve aşağı yönlüyse)
-    if (!userActive && streaming && savedTop != null && getTop(c) > savedTop + 24) {
-      const ok = restoreByAnchor(c);
-      if (!ok && getTop(c) > savedTop + 4) {
-        restoring = true;
-        setTop(c, savedTop);
-        savedTop = getTop(c);
-      }
-      showGoBottom();
+    // Akış sırasında ve kullanıcı dokunmuyorsa: rAF hold pinler, burada karışma.
+    if (streaming && !userActive) {
+      if (savedTop == null && !isNearBottom(c)) setAnchor(c);
+      startHold();
       return;
     }
 
-    // Diğer tüm kaydırmalar kullanıcıya aittir → çapayı güncelle (scrollbar dahil serbest)
-    updateAnchor(c);
-  }
-
-  function updateAnchor(c) {
-    if (isNearBottom(c)) {
-      clearAnchor();
-      hideButton();
-    } else {
-      savedTop = getTop(c);
-      pickAnchor(c);
-      showGoBottom();
-    }
+    // Akış yok VEYA kullanıcı aktif: kaydırma tamamen kullanıcıya ait
+    if (isNearBottom(c)) { clearAnchor(); hideButton(); }
+    else { setAnchor(c); }
   }
 
   // ==========================================
@@ -246,7 +251,6 @@
     document.body.appendChild(btn);
     return btn;
   }
-
   function showGoBottom() {
     if (!active()) return;
     const b = getButton();
@@ -254,12 +258,12 @@
     b.onclick = () => {
       const c = container();
       clearAnchor();
+      holding = false;
       setTop(c, maxScroll(c) + 400);
       hideButton();
     };
     b.style.display = 'flex';
   }
-
   function hideButton() { if (btn) btn.style.display = 'none'; }
 
   // ==========================================
@@ -268,14 +272,10 @@
   function start() {
     ['wheel', 'touchmove', 'touchstart'].forEach(ev =>
       window.addEventListener(ev, onUserScroll, { passive: true, capture: true }));
-
     window.addEventListener('keydown', (e) => {
       if (isTypingTarget(e.target)) return;
-      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
-        onUserScroll();
-      }
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) onUserScroll();
     }, { capture: true });
-
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
     ensureObserver();
   }
