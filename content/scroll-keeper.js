@@ -3,6 +3,9 @@
 // AI sohbetinde yukarıdaki bir yanıtı okurken yeni mesaj gönderince
 // sayfanın seni en alta çekmesini engeller / okuduğun yere döndürür.
 // Modlar (preferences.scrollMode): 'lock' | 'button' | 'off'
+//
+// Konteyner, GERÇEK scroll olayının hedefinden (e.target) öğrenilir —
+// böylece Gemini gibi iç içe scroll yapan arayüzlerde de doğru çalışır.
 // ==========================================
 
 (function () {
@@ -18,16 +21,16 @@
   ];
   if (!AI_HOSTS.some(h => window.location.hostname.includes(h))) return;
 
-  let mode = 'lock';        // varsayılan: kilit
-  let masterEnabled = true; // uzantı genel aç/kapa
-  let savedTop = null;      // kullanıcının yukarıdaki okuma konumu
+  let mode = 'lock';
+  let masterEnabled = true;
+  let savedTop = null;        // okuma konumu (yukarıdayken)
   let lastUserScroll = 0;
   let restoring = false;
-  let cachedContainer = null;
+  let learnedContainer = null; // scroll olaylarından öğrenilen gerçek konteyner
   let btn = null;
 
   // ==========================================
-  // Tercihleri yükle / izle
+  // Tercihler
   // ==========================================
   chrome.storage.local.get('preferences', (r) => {
     applyPrefs(r.preferences);
@@ -54,67 +57,120 @@
   }
 
   // ==========================================
-  // Kaydırma konteynerini bul (mesajların scroll edilebilir atası)
+  // Scroll yardımcıları (element veya döküman)
   // ==========================================
-  function isDocScroller(c) {
+  function docScroller() {
+    return document.scrollingElement || document.documentElement;
+  }
+  function isDoc(c) {
     return c === document.scrollingElement || c === document.documentElement || c === document.body;
   }
   function getTop(c) {
-    return isDocScroller(c) ? (window.scrollY || document.documentElement.scrollTop) : c.scrollTop;
+    return isDoc(c) ? (window.scrollY || document.documentElement.scrollTop) : c.scrollTop;
   }
   function setTop(c, v) {
-    if (isDocScroller(c)) window.scrollTo(0, v);
+    if (isDoc(c)) window.scrollTo(0, v);
     else c.scrollTop = v;
   }
-  function scrollHeightOf(c) {
-    return isDocScroller(c) ? document.documentElement.scrollHeight : c.scrollHeight;
-  }
-  function clientHeightOf(c) {
-    return isDocScroller(c) ? window.innerHeight : c.clientHeight;
+  function maxScroll(c) {
+    const sh = isDoc(c) ? document.documentElement.scrollHeight : c.scrollHeight;
+    const ch = isDoc(c) ? window.innerHeight : c.clientHeight;
+    return sh - ch;
   }
   function isNearBottom(c) {
-    return scrollHeightOf(c) - getTop(c) - clientHeightOf(c) < 90;
+    return maxScroll(c) - getTop(c) < 90;
   }
 
-  function findScrollContainer() {
-    let ref = null;
-    if (window.__TND_AIParser && window.__TND_AIParser.getAnswerElements) {
-      const answers = window.__TND_AIParser.getAnswerElements();
-      if (answers.length) ref = answers[answers.length - 1];
-    }
-    if (!ref) ref = document.querySelector('main') || document.body;
+  function answerEls() {
+    return (window.__TND_AIParser && window.__TND_AIParser.getAnswerElements)
+      ? window.__TND_AIParser.getAnswerElements()
+      : [];
+  }
 
-    let el = ref;
-    while (el && el !== document.documentElement) {
-      const s = getComputedStyle(el);
-      if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 8) {
-        return el;
-      }
-      el = el.parentElement;
+  // e.target bir "sohbet" scroller'ı mı? (AI cevabı içeriyor mu)
+  function isConversationScroller(c) {
+    if (!c) return false;
+    if (isDoc(c)) {
+      // döküman scroller'ı: sayfa kendisi kayıyorsa
+      return maxScroll(c) > 40;
     }
-    return document.scrollingElement || document.documentElement;
+    if (c.nodeType !== 1) return false;
+    if (maxScroll(c) < 40) return false;
+    const ans = answerEls();
+    return ans.length > 0 && ans.some(a => c.contains(a));
+  }
+
+  function rememberContainer(c) {
+    // Element scroller'ı tercih et; döküman scroller'ı yalnızca başka yoksa
+    if (isDoc(c)) {
+      if (!learnedContainer || !learnedContainer.isConnected) learnedContainer = c;
+    } else {
+      learnedContainer = c;
+    }
   }
 
   function container() {
-    if (cachedContainer && cachedContainer.isConnected) return cachedContainer;
-    cachedContainer = findScrollContainer();
-    return cachedContainer;
+    if (learnedContainer && (isDoc(learnedContainer) || learnedContainer.isConnected)) {
+      return learnedContainer;
+    }
+    return guessContainer();
+  }
+
+  function guessContainer() {
+    const ans = answerEls();
+    let ref = ans.length ? ans[ans.length - 1] : (document.querySelector('main') || document.body);
+    let el = ref;
+    while (el && el !== document.documentElement) {
+      const s = getComputedStyle(el);
+      if (/(auto|scroll|overlay)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 8) return el;
+      el = el.parentElement;
+    }
+    return docScroller();
   }
 
   // ==========================================
-  // Kullanıcı kaydırma niyeti
+  // Olaylar
   // ==========================================
   function onUserScroll() {
     lastUserScroll = Date.now();
-    updateAnchor();
   }
 
-  function updateAnchor() {
+  function onScroll(e) {
     if (!active()) return;
-    const c = container();
-    if (!c) return;
+
+    let c = e.target;
+    if (c === document || c === window || !c) c = docScroller();
+    if (c.nodeType === 9) c = docScroller(); // document node
+    if (!isConversationScroller(c)) return;
+
+    rememberContainer(c);
+
+    if (restoring) { restoring = false; return; }
+
+    const userActive = Date.now() - lastUserScroll < 300;
+    if (userActive) {
+      updateAnchor(c);
+      return;
+    }
+
+    // Programatik (site kaynaklı) kaydırma
+    if (savedTop == null) return;
+
+    if (mode === 'lock') {
+      if (getTop(c) > savedTop + 4) {
+        restoring = true;
+        setTop(c, savedTop);
+        showGoBottom();
+      }
+    } else if (mode === 'button') {
+      if (isNearBottom(c) && getTop(c) > savedTop + 60) {
+        showReturn();
+      }
+    }
+  }
+
+  function updateAnchor(c) {
     if (isNearBottom(c)) {
-      // En altta: takip moduna dön
       savedTop = null;
       hideButton();
     } else {
@@ -124,38 +180,7 @@
   }
 
   // ==========================================
-  // Scroll olayı: programatik (sitenin) alta kaymayı yakala
-  // ==========================================
-  function onScroll() {
-    if (!active()) return;
-    const c = container();
-    if (!c) return;
-
-    if (restoring) { restoring = false; return; }
-
-    const userActive = Date.now() - lastUserScroll < 250;
-    if (userActive) { updateAnchor(); return; }
-
-    // Buradan sonrası: programatik (site kaynaklı) kaydırma
-    if (savedTop == null) return;
-
-    if (mode === 'lock') {
-      // Aşağı zıpladıysa okuma konumuna geri yapıştır
-      if (getTop(c) > savedTop + 4) {
-        restoring = true;
-        setTop(c, savedTop);
-        showGoBottom();
-      }
-    } else if (mode === 'button') {
-      // Alta zıpladıysa "geri dön" butonunu göster
-      if (isNearBottom(c) && getTop(c) > savedTop + 60) {
-        showReturn();
-      }
-    }
-  }
-
-  // ==========================================
-  // Yüzen buton (moda göre değişir)
+  // Yüzen buton
   // ==========================================
   function getButton() {
     if (btn) return btn;
@@ -174,7 +199,7 @@
     b.onclick = () => {
       const c = container();
       savedTop = null;
-      setTop(c, scrollHeightOf(c));
+      setTop(c, maxScroll(c) + 200);
       hideButton();
     };
     b.style.display = 'flex';
@@ -185,10 +210,7 @@
     const b = getButton();
     b.innerHTML = '<span class="tnd-scroll-ic">↩</span> Okuduğun yere dön';
     b.onclick = () => {
-      if (savedTop != null) {
-        const c = container();
-        setTop(c, savedTop);
-      }
+      if (savedTop != null) setTop(container(), savedTop);
       hideButton();
     };
     b.style.display = 'flex';
@@ -211,10 +233,7 @@
       }
     }, { capture: true });
 
-    // Tüm scroll olaylarını capture aşamasında yakala (konteyner + döküman)
+    // Tüm scroll olaylarını capture aşamasında yakala (her elemandan)
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
-
-    // Konteyner sayfa yüklendikçe değişebilir; arada bir tazele
-    setInterval(() => { cachedContainer = null; }, 2000);
   }
 })();

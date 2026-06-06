@@ -164,21 +164,21 @@
    ========================================== */
 .tnd-scroll-btn {
   position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 24px;
+  right: 24px;
+  left: auto;
   z-index: 2147483646;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, rgba(15, 17, 23, 0.94), rgba(26, 29, 39, 0.97));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(0, 212, 170, 0.45);
-  border-radius: 22px;
+  border-radius: 20px;
   color: #e4e4e7;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   box-shadow:
@@ -193,11 +193,11 @@
   background: linear-gradient(135deg, rgba(0, 212, 170, 0.2), rgba(15, 17, 23, 0.96));
   border-color: rgba(0, 212, 170, 0.7);
   box-shadow: 0 8px 32px rgba(0, 212, 170, 0.25);
-  transform: translateX(-50%) translateY(-1px);
+  transform: translateY(-1px);
 }
 
 .tnd-scroll-btn:active {
-  transform: translateX(-50%) scale(0.97);
+  transform: scale(0.97);
 }
 
 .tnd-scroll-ic {
