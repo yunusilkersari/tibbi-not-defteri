@@ -51,13 +51,17 @@ PLATFORMS.forEach((p) => {
 });
 
 // Kayıtlı değerleri yükle
-chrome.storage.local.get('customSelectors', (result) => {
+chrome.storage.local.get(['customSelectors', 'preferences'], (result) => {
   const custom = result.customSelectors || {};
   PLATFORMS.forEach((p) => {
     const c = custom[p.key] || {};
     if (c.responseSelector) document.getElementById(`${p.key}-response`).value = c.responseSelector;
     if (c.userSelector) document.getElementById(`${p.key}-user`).value = c.userSelector;
   });
+
+  // Görsel gömme tercihi (varsayılan: açık)
+  const prefs = result.preferences || {};
+  document.getElementById('embedImages').checked = prefs.embedImages !== false;
 });
 
 // Kaydet
@@ -72,8 +76,14 @@ document.getElementById('saveBtn').addEventListener('click', () => {
       if (user) custom[p.key].userSelector = user;
     }
   });
-  chrome.storage.local.set({ customSelectors: custom }, () => {
-    showStatus('✅ Kaydedildi. İlgili AI sekmesini yenileyin.');
+  const embedImages = document.getElementById('embedImages').checked;
+
+  chrome.storage.local.get('preferences', (r) => {
+    const prefs = r.preferences || {};
+    prefs.embedImages = embedImages;
+    chrome.storage.local.set({ customSelectors: custom, preferences: prefs }, () => {
+      showStatus('✅ Kaydedildi. İlgili AI sekmesini yenileyin.');
+    });
   });
 });
 

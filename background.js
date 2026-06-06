@@ -121,9 +121,74 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 }
 
+// ==========================================
+// Görselleri kalıcı gömme (data-URL)
+// Uzak görseller kaynak sayfa gidince kırılmasın diye base64'e çevrilir.
+// Depolama şişmesine karşı: en çok 10 görsel, her biri en fazla 1.5MB.
+// ==========================================
+const IMG_MAX_COUNT = 10;
+const IMG_MAX_BYTES = 1.5 * 1024 * 1024;
+
+async function inlineImagesInHtml(html) {
+  if (!html || html.indexOf('<img') === -1) return html;
+
+  const srcRegex = /<img\b[^>]*?\ssrc\s*=\s*("([^"]*)"|'([^']*)')/gi;
+  const urls = new Set();
+  let m;
+  while ((m = srcRegex.exec(html)) !== null) {
+    const url = m[2] || m[3];
+    if (url && !/^data:/i.test(url)) urls.add(url);
+  }
+  if (urls.size === 0) return html;
+
+  const map = {};
+  let count = 0;
+  for (const url of urls) {
+    if (count >= IMG_MAX_COUNT) break;
+    count++;
+    try {
+      const dataUrl = await fetchAsDataUrl(url);
+      if (dataUrl) map[url] = dataUrl;
+    } catch (e) {
+      // başarısızsa orijinal URL kalır
+    }
+  }
+
+  let out = html;
+  Object.keys(map).forEach((url) => {
+    out = out.split(url).join(map[url]);
+  });
+  return out;
+}
+
+async function fetchAsDataUrl(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) return null;
+    const type = resp.headers.get('content-type') || 'image/png';
+    if (!type.startsWith('image/')) return null;
+
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength > IMG_MAX_BYTES) return null;
+
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return `data:${type};base64,${btoa(binary)}`;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function saveNote(data) {
-  const result = await chrome.storage.local.get(['notes']);
+  const result = await chrome.storage.local.get(['notes', 'preferences']);
   const notes = result.notes || [];
+  const prefs = result.preferences || {};
 
   // Yinelenen koruması: aynı içerikli not zaten kayıtlıysa yenisini ekleme
   const newContent = (data.content || '').trim();
@@ -134,10 +199,20 @@ async function saveNote(data) {
     }
   }
 
+  // Görselleri kalıcı kaydet (data-URL) — tercih kapalı değilse
+  let contentHtml = data.contentHtml || '';
+  if (contentHtml && prefs.embedImages !== false) {
+    try {
+      contentHtml = await inlineImagesInHtml(contentHtml);
+    } catch (err) {
+      console.warn('Görsel gömme hatası:', err);
+    }
+  }
+
   const note = {
     id: generateId(),
     content: data.content || '',
-    contentHtml: data.contentHtml || '',
+    contentHtml: contentHtml,
     sourceUrl: data.sourceUrl || '',
     sourceTitle: data.sourceTitle || '',
     createdAt: new Date().toISOString(),
