@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Tıbbi Not Defteri</title>
+
+  <!-- ===== PWA (mobil uygulama) etiketleri ===== -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f0f14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Not Defteri">
+  <link rel="apple-touch-icon" href="icons/icon256.png">
+  <link rel="icon" type="image/png" href="icons/icon128.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- app/* dosyaları AYNEN kullanılır (kopyalanmaz) -->
+  <link rel="stylesheet" href="app/app.css">
+  <!-- Mobil-özel ek stiller (app.css'e dokunmaz) -->
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- ====== SIDEBAR ====== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <!-- Logo -->
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <span class="sidebar-logo-icon">🩺</span>
+            <span class="sidebar-logo-text">Tıbbi Not Defteri</span>
+          </div>
+          <button class="sidebar-toggle" id="sidebarToggle" title="Kenar çubuğunu kapat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Quick Note -->
+        <div class="sidebar-section">
+          <button class="sidebar-new-note-btn" id="newNoteBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Yeni Not
+          </button>
+        </div>
+
+        <!-- Calendar -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>📅 Takvim</span>
+          </div>
+          <div class="calendar" id="calendar">
+            <div class="calendar-header">
+              <button class="calendar-nav" id="calPrev">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="calendar-month" id="calMonth"></span>
+              <button class="calendar-nav" id="calNext">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>Pt</span><span>Sa</span><span>Ça</span><span>Pe</span><span>Cu</span><span>Ct</span><span>Pz</span>
+            </div>
+            <div class="calendar-days" id="calDays"></div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🔍 Ara</span>
+          </div>
+          <div class="search-box">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" class="search-input" id="searchInput" placeholder="Notlarda ara...">
+            <button class="search-clear" id="searchClear" style="display:none">✕</button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🏷️ Filtreler</span>
+          </div>
+          <div class="filter-buttons">
+            <button class="filter-btn" data-filter="all">
+              <span class="filter-icon">📋</span> Tüm Notlar
+            </button>
+            <button class="filter-btn" data-filter="starred">
+              <span class="filter-icon">⭐</span> Yıldızlı
+            </button>
+            <button class="filter-btn active" data-filter="today">
+              <span class="filter-icon">📆</span> Bugün
+            </button>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">
+            <span>🔖 Etiketler</span>
+          </div>
+          <div class="tag-cloud" id="tagCloud">
+            <div class="tag-empty">Henüz etiket yok</div>
+          </div>
+        </div>
+
+
+        <!-- Stats -->
+        <div class="sidebar-section sidebar-stats">
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Toplam Not</span>
+            <span class="sidebar-stat-value" id="statTotal">0</span>
+          </div>
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Bugün</span>
+            <span class="sidebar-stat-value" id="statToday">0</span>
+          </div>
+          <div class="sidebar-stat-row">
+            <span class="sidebar-stat-label">Yıldızlı</span>
+            <span class="sidebar-stat-value" id="statStarred">0</span>
+          </div>
+        </div>
+
+        <!-- Senkron (mobil-özel) -->
+        <div class="sidebar-section sidebar-data-actions">
+          <button class="data-action-btn" id="syncSettingsBtn">
+            <span id="syncStatusDot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#777;margin-right:4px;"></span>
+            ☁️ Senkron Ayarları
+          </button>
+        </div>
+
+        <!-- Data Actions -->
+        <div class="sidebar-section sidebar-data-actions">
+          <button class="data-action-btn" id="exportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            JSON Dışa Aktar
+          </button>
+          <button class="data-action-btn" id="importBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            JSON İçe Aktar
+          </button>
+          <div class="data-action-row">
+            <button class="data-action-btn data-action-btn-sm" id="exportMdBtn" title="Görünen notları Markdown olarak indir">📄 Markdown</button>
+            <button class="data-action-btn data-action-btn-sm" id="exportCsvBtn" title="Görünen notları CSV olarak indir">📊 CSV</button>
+          </div>
+          <button class="data-action-btn" id="printBtn" title="Görünen notları yazdır veya PDF olarak kaydet">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+            Yazdır / PDF
+          </button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content" id="mainContent">
+      <!-- Top Bar -->
+      <div class="topbar">
+        <button class="topbar-menu-btn" id="menuToggle" title="Menü">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+        <div class="topbar-title" id="topbarTitle">
+          <span class="topbar-date-day" id="topbarDay"></span>
+          <span class="topbar-date-full" id="topbarDate"></span>
+        </div>
+        <div class="topbar-actions">
+          <div class="topbar-theme-toggle" id="themeToggle">
+            <button class="topbar-theme-btn active" data-theme="dark" title="Koyu Tema">🌙</button>
+            <button class="topbar-theme-btn" data-theme="light" title="Açık Tema">☀️</button>
+          </div>
+          <button class="topbar-icon-btn" id="topbarReadAll" title="Toplu Oku — görünen tüm notları günlere göre tek akışta, tam ekran oku">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </button>
+          <button class="topbar-icon-btn" id="topbarFullscreen" title="Tam Ekran">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          </button>
+          <span class="topbar-note-count" id="topbarNoteCount">0 not</span>
+        </div>
+      </div>
+
+      <!-- Yerel kayıt hatası uyarısı -->
+      <div class="disk-error-banner hidden" id="diskErrorBanner">
+        <span class="disk-error-text">⚠️ Notlar bilgisayara (yerel dosyaya) kaydedilemiyor. Veriler tarayıcıda güvende, ama <strong>data/notlar.json</strong> güncellenmiyor. Native host kurulumunu kontrol edin.</span>
+        <button class="disk-error-close" id="diskErrorClose" title="Kapat">✕</button>
+      </div>
+
+      <!-- Notes Container -->
+      <div class="notes-container" id="notesContainer">
+        <!-- Notes are rendered here dynamically -->
+        <div class="notes-empty" id="notesEmpty">
+          <div class="notes-empty-icon">📝</div>
+          <div class="notes-empty-title">Henüz not yok</div>
+          <div class="notes-empty-text">
+            Sağ alttaki <strong>+</strong> ile yeni not ekleyin,<br>
+            veya bilgisayardaki defterden senkronlayın.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ====== MODALS ====== -->
+  <!-- Edit Note Modal -->
+  <div class="modal-overlay" id="editModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">📝 Notu Düzenle</h2>
+        <button class="modal-close" id="editModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">İçerik</label>
+          <div class="rich-toolbar" id="editToolbar">
+            <button type="button" class="rich-btn" data-cmd="bold" title="Kalın"><b>B</b></button>
+            <button type="button" class="rich-btn" data-cmd="italic" title="İtalik"><i>I</i></button>
+            <button type="button" class="rich-btn" data-cmd="underline" title="Altı çizili"><u>U</u></button>
+            <span class="rich-sep"></span>
+            <button type="button" class="rich-btn" data-cmd="insertUnorderedList" title="Madde listesi">• Liste</button>
+            <button type="button" class="rich-btn" data-cmd="formatBlock" data-value="h3" title="Başlık">H</button>
+            <span class="rich-sep"></span>
+            <button type="button" class="rich-btn" data-cmd="removeFormat" title="Biçimi temizle">✕ Biçim</button>
+          </div>
+          <div class="modal-textarea rich-editor" id="editContent" contenteditable="true"></div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Kişisel Not</label>
+          <textarea class="modal-textarea modal-textarea-sm" id="editUserNote" rows="3" placeholder="Kendi notlarınızı ekleyin..."></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Etiketler (virgülle ayırın)</label>
+          <input type="text" class="modal-input" id="editTags" placeholder="acil, kardiyoloji, nöroloji">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="editModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-primary" id="editModalSave">💾 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Note Modal -->
+  <div class="modal-overlay" id="newNoteModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">✏️ Yeni Not</h2>
+        <button class="modal-close" id="newNoteModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">İçerik</label>
+          <textarea class="modal-textarea" id="newNoteContent" rows="8" placeholder="Not içeriğinizi yazın..."></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Etiketler (virgülle ayırın)</label>
+          <input type="text" class="modal-input" id="newNoteTags" placeholder="acil, kardiyoloji, nöroloji">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="newNoteModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-primary" id="newNoteModalSave">📋 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="deleteModal" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">🗑️ Notu Sil</h2>
+        <button class="modal-close" id="deleteModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">Bu notu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" id="deleteModalCancel">İptal</button>
+        <button class="modal-btn modal-btn-danger" id="deleteModalConfirm">🗑️ Sil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Read Note Modal -->
+  <div class="modal-overlay" id="readModal" style="display:none">
+    <div class="modal read-modal" id="readModalDialog" style="width: min(720px, 90vw);">
+      <div class="modal-header">
+        <h2 class="modal-title">📖 Notu Oku</h2>
+        <div class="read-modal-width-control" id="readModalWidthControl">
+          <button class="width-toggle-btn" id="widthToggleBtn" title="Genişlik Ayarla">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3H3v18h18V3zM9 3v18M15 3v18"/></svg>
+          </button>
+          <div class="width-slider-panel" id="widthSliderPanel">
+            <input type="range" class="width-slider" id="readModalWidthSlider" min="40" max="100" value="65" title="İçerik genişliği">
+            <span class="width-value" id="readModalWidthValue">65%</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="read-modal-meta" id="readModalMeta"></span>
+          <button class="modal-header-btn" id="readModalFullscreen" title="Tam Ekran">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          </button>
+          <button class="modal-close" id="readModalClose">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" style="max-height:60vh; overflow-y:auto;">
+        <div id="readModalContent" class="note-card-content" style="font-size:15px; line-height:1.85; color:var(--text-primary); word-break:break-word; max-height:none; overflow-y:auto;"></div>
+        <div id="readModalUserNote" style="display:none; margin-top:16px; padding:12px 16px; background:var(--accent-secondary-dim); border:1px solid rgba(108,99,255,0.12); border-radius:var(--radius-sm); font-size:14px; color:#b0adff; line-height:1.6; font-style:italic;"></div>
+        <div id="readModalSource" style="display:none; margin-top:16px; font-size:12px; color:var(--text-tertiary);"></div>
+        <div id="readModalTags" style="display:none; margin-top:12px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+      </div>
+      <div class="modal-footer read-modal-footer">
+        <div class="read-modal-nav">
+          <button class="modal-btn modal-btn-nav" id="readModalPrev" title="Önceki Not">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>Önceki</span>
+          </button>
+          <span class="read-modal-counter" id="readModalCounter"></span>
+          <button class="modal-btn modal-btn-nav" id="readModalNext" title="Sonraki Not">
+            <span>Sonraki</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="read-modal-actions">
+          <button class="modal-btn modal-btn-secondary" id="readModalCopyBtn" title="Notu panoya kopyala">📋 Kopyala</button>
+          <button class="modal-btn modal-btn-secondary" id="readModalEditBtn">✏️ Düzenle</button>
+          <button class="modal-btn modal-btn-primary" id="readModalCloseBtn">Kapat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MOBİL-ÖZEL: Senkron Ayarları Modalı ====== -->
+  <div class="modal-overlay" id="syncModal" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">☁️ Bulut Senkron</h2>
+        <button class="modal-close" id="syncModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text" id="syncStatusText" style="margin-bottom:14px;">Durum: kapalı</p>
+        <div class="modal-field">
+          <label class="modal-label">GitHub Token (yalnızca "gist" izinli)</label>
+          <input type="password" class="modal-input" id="syncToken" placeholder="ghp_… veya github_pat_…" autocomplete="off">
+          <small style="color:var(--text-tertiary); font-size:11px; display:block; margin-top:6px;">
+            Token yalnızca <strong>bu telefonda</strong> saklanır, hiçbir yere gönderilmez.
+          </small>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Gist ID (boş bırak → otomatik oluşturulur)</label>
+          <input type="text" class="modal-input" id="syncGistId" placeholder="(ilk kurulumda boş bırakın)" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-danger" id="syncDisconnectBtn" style="margin-right:auto;">Bağlantıyı Kes</button>
+        <button class="modal-btn modal-btn-secondary" id="syncNowBtn">🔄 Şimdi Senkronla</button>
+        <button class="modal-btn modal-btn-primary" id="syncSaveBtn">💾 Bağlan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MOBİL-ÖZEL: Yeni not için kayan (+) buton ====== -->
+  <button class="mobile-fab" id="mobileFab" title="Yeni Not" aria-label="Yeni Not">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- ===== Önce mobil shim (chrome.* + senkron), sonra app/* AYNEN ===== -->
+  <script src="mobile-shim.js"></script>
+  <script src="app/storage.js"></script>
+  <script src="app/app.js"></script>
+  <script src="mobile-settings.js"></script>
+  <script>
+    // Service worker (çevrimdışı çalışma)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) {
+          console.warn('SW kaydı başarısız', e);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

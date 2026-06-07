@@ -1,0 +1,90 @@
+/* ============================================================
+   Tıbbi Not Defteri — Mobil-özel stiller
+   app.css'e DOKUNMADAN, sadece mobil/PWA için ekler.
+   ============================================================ */
+
+/* iOS güvenli alan (çentik) desteği */
+.topbar {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* ====== Kayan "Yeni Not" (+) butonu — sadece mobilde ====== */
+.mobile-fab {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-primary);
+  color: #04201a;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-lg), 0 0 24px var(--accent-primary-glow);
+  z-index: 1500;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+.mobile-fab:active { transform: scale(0.92); background: var(--accent-primary-hover); }
+
+/* ====== Senkron durum noktası ====== */
+#syncStatusDot { transition: background var(--transition-fast); }
+
+/* ====== Çekmece (drawer) arka planı — sidebar açıkken ====== */
+.mobile-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+.mobile-backdrop.show { display: block; opacity: 1; }
+
+/* ============================================================
+   MOBİL DÜZEN (telefon)
+   ============================================================ */
+@media (max-width: 768px) {
+  .mobile-fab { display: flex; }
+
+  /* Sidebar bir çekmece gibi davransın; üstte kalsın */
+  .sidebar { z-index: 100; }
+
+  /* Dokunmatik için daha büyük hedefler */
+  .filter-btn,
+  .data-action-btn,
+  .sidebar-new-note-btn {
+    min-height: 44px;
+  }
+  .calendar-day { min-height: 34px; }
+
+  /* Modallar telefonda neredeyse tam genişlik */
+  .modal {
+    width: 94vw !important;
+    max-width: 94vw !important;
+    max-height: 90vh;
+  }
+  .read-modal { width: 94vw !important; }
+
+  /* Topbar başlığı taşmasın */
+  .topbar-title { min-width: 0; overflow: hidden; }
+  .topbar-date-full { display: none; }
+
+  /* Not kartları biraz daha sıkı */
+  .notes-container { padding: 14px; padding-bottom: 90px; }
+
+  /* iOS'ta input'a tıklayınca otomatik zoom olmasın diye 16px taban */
+  .modal-input,
+  .modal-textarea,
+  .search-input {
+    font-size: 16px;
+  }
+}
+
+/* Çok dar ekran (küçük telefonlar) */
+@media (max-width: 380px) {
+  .topbar-theme-toggle { display: none; }
+}

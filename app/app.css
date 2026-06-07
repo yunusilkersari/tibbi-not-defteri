@@ -1690,9 +1690,12 @@ body {
   padding-bottom: 6px;
 }
 
-/* Root fullscreen olduğunda arka planı ve sidebar'ı gizle */
-:fullscreen .app-layout,
-:-webkit-full-screen .app-layout {
+/* Root fullscreen olduğunda arka planı ve sidebar'ı gizle —
+   AMA yalnızca NOT OKUMA tam ekranında (reading-fs). Topbar "Tam Ekran"
+   butonu bu sınıfı eklemez; böylece o modda tüm defter görünür kalır
+   (yoksa app-layout gizlenip okuma penceresi de kapalı olunca beyaz ekran olur). */
+:fullscreen.reading-fs .app-layout,
+:-webkit-full-screen.reading-fs .app-layout {
   display: none;
 }
 
@@ -1704,6 +1707,10 @@ body {
   padding: 0 8px;
   color: var(--text-tertiary);
   position: relative;
+  /* Sola sabitle: sagdaki meta metni notlar arasi degisken uzunlukta olunca
+     space-between bu kontrolu ittirip konumunu kaydiriyordu. margin-right:auto
+     ile kontrol sabit kalir, sag grup (meta+butonlar) saga yaslanir. */
+  margin-right: auto;
 }
 
 .width-toggle-btn {
