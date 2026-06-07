@@ -1901,3 +1901,47 @@ body {
 [data-theme="light"] .sidebar-inner::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.10);
 }
+
+/* ==========================================
+   Toplu Okuma (Read-All) — tek akışta tüm notlar
+   ========================================== */
+.read-all-day {
+  position: sticky;
+  top: -1px;
+  background: var(--bg-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  padding: 10px 0 8px;
+  margin: 22px 0 6px;
+  border-bottom: 1px solid var(--border-primary);
+  z-index: 2;
+}
+.read-all-day:first-child { margin-top: 0; }
+
+.read-all-note {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-primary);
+}
+.read-all-note:last-child { border-bottom: none; }
+
+.read-all-note-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+
+.read-all-usernote {
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 13px;
+  color: #b0adff;
+}
+
+.read-all-tags {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

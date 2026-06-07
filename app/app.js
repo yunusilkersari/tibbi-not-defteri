@@ -23,6 +23,9 @@
     readingNoteIndex: -1,
     readModalNotes: [],
     readModalFullscreen: false,
+    readAllMode: false,
+    readAllDayNo: null,
+    readAllTotalDays: 0,
     renderList: [],
     renderedCount: 0
   };
@@ -258,7 +261,7 @@
       const activeEl = document.activeElement;
       const isSlider = activeEl === DOM.readModalWidthSlider;
 
-      // Sol/sağ ok: Notlar arası geçiş (genişlik slider'ı odakta değilse)
+      // Sol/sağ ok: notlar arası geçiş (toplu modda tüm arşiv; ← geri/daha eski, → ileri/daha yeni)
       if (state.readModalNotes.length > 0 && !isSlider) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault();
@@ -372,7 +375,7 @@
       if (note) copyNoteText(note);
     });
 
-    // Read Modal Navigation
+    // Read Modal Navigation (not not; toplu modda tüm arşiv üzerinde)
     DOM.readModalPrev.addEventListener('click', () => navigateReadModal(-1));
     DOM.readModalNext.addEventListener('click', () => navigateReadModal(1));
 
@@ -419,6 +422,9 @@
         document.exitFullscreen();
       }
     });
+
+    // Topbar toplu oku (görünen tüm notları tek akışta, tam ekran)
+    document.getElementById('topbarReadAll').addEventListener('click', openReadAll);
 
     // Theme toggle
     DOM.themeToggle.addEventListener('click', (e) => {
@@ -859,8 +865,13 @@
   // Read Modal
   // ==========================================
   async function openReadModal(note) {
-    // Mevcut not listesini al (navigasyon için)
-    const allCurrentNotes = await getCurrentNoteList();
+    state.readAllMode = false;
+    applyReadAllChrome(false);
+    // Navigasyon için listeyi ESKİDEN YENİYE sırala:
+    // Önceki = daha eski, Sonraki = daha yeni (toplu okuma ile tutarlı).
+    const allCurrentNotes = (await getCurrentNoteList())
+      .slice()
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     state.readModalNotes = allCurrentNotes;
     state.readingNoteIndex = allCurrentNotes.findIndex(n => n.id === note.id);
     if (state.readingNoteIndex === -1) state.readingNoteIndex = 0;
@@ -884,6 +895,57 @@
       // Tam ekran reddedilirse normal pencere modunda aç
     }
     await openReadModal(note);
+  }
+
+  // ==========================================
+  // Toplu Okuma — TÜM arşiv, not not (en ESKİ günden itibaren)
+  // Mevcut tekli okuyucuyu kullanır: ←/→ notları çevirir, gün sınırını otomatik geçer.
+  // İçeriğin başında gün rozeti gösterilir (gün geçişi görünür olsun).
+  // ==========================================
+  async function openReadAll() {
+    // TÜM notları al, ESKİDEN YENİYE sırala (ilk gün önce; → = ileri/daha yeni).
+    const all = (await NotStorage.getAll())
+      .slice()
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (!all.length) { showAppToast('⚠️ Okunacak not yok'); return; }
+
+    // Gün numaralandırması (rozet: "Gün X / Y")
+    const dayNo = new Map();
+    all.forEach((n) => {
+      const k = new Date(n.createdAt).toDateString();
+      if (!dayNo.has(k)) dayNo.set(k, dayNo.size + 1);
+    });
+    state.readAllDayNo = dayNo;
+    state.readAllTotalDays = dayNo.size;
+
+    state.readAllMode = true;
+    state.readModalNotes = all;
+    state.readingNoteIndex = 0; // ilk gün, ilk not
+
+    applyReadAllChrome(true);
+    renderReadModalNote(all[0]);
+    updateReadModalNav();
+
+    // Kullanıcı tıklaması hâlâ aktifken tam ekrana geç (çift-açılım/parlama olmaz)
+    try {
+      await document.documentElement.requestFullscreen();
+      state.readModalFullscreen = true;
+      updateFullscreenIcon(true);
+    } catch (e) {
+      // tam ekran reddedilirse pencere modunda aç
+    }
+
+    DOM.readModal.style.display = '';
+    focusReadModalBody();
+  }
+
+  // Toplu/tekil moda göre modal başlık ve "Düzenle" butonunu ayarla.
+  // Alt navigasyon her iki modda görünür: tekil modda not, toplu modda GÜN geçişi.
+  function applyReadAllChrome(isAll) {
+    const title = DOM.readModal.querySelector('.modal-title');
+    const editBtn = document.getElementById('readModalEditBtn');
+    if (title) title.textContent = isAll ? '📖 Toplu Okuma' : '📖 Notu Oku';
+    if (editBtn) editBtn.style.display = isAll ? 'none' : '';
   }
 
   // Ok tuşlarıyla scroll için modal body'ye odaklan
@@ -921,6 +983,17 @@
       DOM.readModalContent.innerHTML = note.contentHtml;
     } else {
       DOM.readModalContent.textContent = note.content;
+    }
+
+    // Toplu modda: içeriğin başına gün rozeti (gün otomatik geçişi görünür olsun)
+    if (state.readAllMode) {
+      const dayNum = state.readAllDayNo ? state.readAllDayNo.get(time.toDateString()) : null;
+      const banner = document.createElement('div');
+      banner.className = 'read-all-day';
+      banner.textContent = dayNum
+        ? `${dateStr} · Gün ${dayNum} / ${state.readAllTotalDays}`
+        : dateStr;
+      DOM.readModalContent.insertBefore(banner, DOM.readModalContent.firstChild);
     }
 
     if (note.userNote) {
@@ -1045,6 +1118,9 @@
     state.readingNoteIndex = -1;
     state.readModalNotes = [];
     state.readModalFullscreen = false;
+    state.readAllMode = false;
+    state.readAllDayNo = null;
+    applyReadAllChrome(false);
     updateFullscreenIcon(false);
   }
 
