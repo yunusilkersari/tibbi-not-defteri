@@ -197,7 +197,12 @@
     btn.className = 'tnd-root tnd-scroll-btn';
     btn.type = 'button';
     btn.style.display = 'none';
-    btn.innerHTML = '<span class="tnd-scroll-ic">⤓</span> Yeni yanıtlara git';
+    // Trusted Types (Gemini CSP) innerHTML'i yasakliyor; düğümleri elle kur.
+    const ic = document.createElement('span');
+    ic.className = 'tnd-scroll-ic';
+    ic.textContent = '⤓';
+    btn.appendChild(ic);
+    btn.appendChild(document.createTextNode(' Yeni yanıtlara git'));
     btn.addEventListener('click', () => {
       const c = lockedC || document.scrollingElement || document.documentElement;
       setLock(false); // önce kilidi aç, yoksa kendi kaydırmamız da bloklanır
