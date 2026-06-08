@@ -100,6 +100,13 @@
        aninda tam ekran (seri gecis). */
     animation: none !important;
     transform: none !important;
+    /* ÖNEMLI: .modal taban stili opacity:0 ile baslar; paneli normalde
+       modalSlideIn animasyonu gorunur yapar. Animasyonu yukarida
+       kapattigimiz icin paneli ELLE opak yapmazsak opacity:0'da TAKILIR ->
+       panel gorunmez ama tiklanabilir kalir (kullanici karartili bos ekran
+       gorur, farkinda olmadan icindeki kaynak baglantisina/X'e basar).
+       Bu yuzden opacity:1 SART. */
+    opacity: 1 !important;
   }
 
   html.reading-fs #readModal .read-modal .modal-body {
