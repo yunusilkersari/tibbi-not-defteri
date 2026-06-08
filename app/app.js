@@ -113,6 +113,7 @@
     readModal: document.getElementById('readModal'),
     readModalDialog: document.getElementById('readModalDialog'),
     readModalContent: document.getElementById('readModalContent'),
+    readModalSlide: document.getElementById('readModalSlide'),
     readModalUserNote: document.getElementById('readModalUserNote'),
     readModalSource: document.getElementById('readModalSource'),
     readModalTags: document.getElementById('readModalTags'),
@@ -385,6 +386,101 @@
     // Read Modal Navigation (not not; toplu modda tüm arşiv üzerinde)
     DOM.readModalPrev.addEventListener('click', () => navigateReadModal(-1));
     DOM.readModalNext.addEventListener('click', () => navigateReadModal(1));
+
+    // ==========================================
+    // Dokunmatik kaydırma ile not geçişi (mobil)
+    // Parmağı takip eden sürükleme; bırakınca kayarak geçiş ya da geri yaylanma.
+    // Yatay kaydırma = not değiştir; dikey kaydırma = normal okuma kaydırması (engellenmez).
+    // ==========================================
+    (function setupReadSwipe() {
+      const body = DOM.readModal.querySelector('.modal-body');
+      const slide = DOM.readModalSlide;
+      if (!body || !slide) return;
+
+      body.style.touchAction = 'pan-y';   // dikey kaydırma native kalsın, yatay bize gelsin
+      body.style.overflowX = 'hidden';    // kayarken yanlardan taşmayı kırp
+
+      let startX = 0, startY = 0, dx = 0, w = 0;
+      let axis = null;          // null | 'h' | 'v'
+      let dragging = false;
+      let animating = false;
+
+      const atStart = () => state.readingNoteIndex <= 0;
+      const atEnd = () => state.readingNoteIndex >= state.readModalNotes.length - 1;
+
+      function paint(x, withTransition) {
+        slide.style.transition = withTransition
+          ? 'transform 0.22s cubic-bezier(.22,.61,.36,1), opacity 0.22s'
+          : 'none';
+        slide.style.transform = x ? 'translateX(' + x + 'px)' : '';
+        slide.style.opacity = w ? String(Math.max(0.4, 1 - Math.abs(x) / (w * 1.5))) : '1';
+      }
+
+      function springBack() {
+        paint(0, true);
+        setTimeout(() => { slide.style.transition = 'none'; slide.style.opacity = '1'; }, 240);
+      }
+
+      // direction: -1 önceki (daha eski), +1 sonraki (daha yeni)
+      function commit(direction) {
+        animating = true;
+        const out = direction === 1 ? -w : w;     // sonraki: sola çık; önceki: sağa çık
+        slide.style.transition = 'transform 0.16s ease-out, opacity 0.16s ease-out';
+        slide.style.transform = 'translateX(' + out + 'px)';
+        slide.style.opacity = '0';
+        setTimeout(() => {
+          navigateReadModal(direction);           // yeni notu yerleştir (render + nav + odak)
+          slide.style.transition = 'none';
+          slide.style.transform = 'translateX(' + (-out) + 'px)';   // yeni içeriği karşı kenara koy
+          slide.style.opacity = '0';
+          void slide.offsetWidth;                 // reflow (geçişi tetiklemek için)
+          slide.style.transition = 'transform 0.2s cubic-bezier(.22,.61,.36,1), opacity 0.2s';
+          slide.style.transform = '';
+          slide.style.opacity = '1';
+          setTimeout(() => { slide.style.transition = 'none'; animating = false; }, 220);
+        }, 160);
+      }
+
+      body.addEventListener('touchstart', (e) => {
+        if (animating || DOM.readModal.style.display === 'none') return;
+        if (e.touches.length !== 1 || state.readModalNotes.length < 2) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        dx = 0; axis = null; dragging = false;
+        w = body.clientWidth || window.innerWidth || 1;
+      }, { passive: true });
+
+      body.addEventListener('touchmove', (e) => {
+        if (animating || !e.touches.length || state.readModalNotes.length < 2) return;
+        const ddx = e.touches[0].clientX - startX;
+        const ddy = e.touches[0].clientY - startY;
+        if (axis === null) {
+          if (Math.abs(ddx) < 8 && Math.abs(ddy) < 8) return;   // yön henüz belirsiz
+          axis = Math.abs(ddx) > Math.abs(ddy) ? 'h' : 'v';
+          if (axis === 'h') dragging = true;
+        }
+        if (axis !== 'h') return;                 // dikey: normal okuma kaydırmasına bırak
+        e.preventDefault();
+        dx = ddx;
+        if ((dx > 0 && atStart()) || (dx < 0 && atEnd())) dx *= 0.28;   // kenarda direnç
+        paint(dx, false);
+      }, { passive: false });
+
+      function endDrag() {
+        if (!dragging) { axis = null; return; }
+        dragging = false;
+        const threshold = Math.max(60, w * 0.18);
+        const blocked = (dx > 0 && atStart()) || (dx < 0 && atEnd());
+        if (!blocked && Math.abs(dx) > threshold) {
+          commit(dx > 0 ? -1 : 1);
+        } else {
+          springBack();
+        }
+        axis = null;
+      }
+      body.addEventListener('touchend', endDrag, { passive: true });
+      body.addEventListener('touchcancel', endDrag, { passive: true });
+    })();
 
     // Overlay'e (dışarıya) tıklayınca kapat (tam ekranda değilken)
     DOM.readModal.addEventListener('click', (e) => {
