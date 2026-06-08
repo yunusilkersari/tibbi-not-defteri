@@ -1,10 +1,12 @@
-<# 
+﻿<# 
   Tıbbi Not Defteri - Native Messaging Host
   Chrome uzantısından gelen mesajları alıp notlar.json dosyasını günceller
 #>
 
 $dataDir = Join-Path $PSScriptRoot "data"
 $dataFile = Join-Path $dataDir "notlar.json"
+$syncConfigFile = Join-Path $dataDir "sync-config.json"
+$syncFileName = "notlar.json"
 
 # data klasörünü oluştur
 if (-not (Test-Path $dataDir)) {
@@ -93,6 +95,217 @@ function Load-Notes {
     return @()
 }
 
+function Get-DiskArchiveInfo {
+    $exists = Test-Path $dataFile
+    $count = 0
+    $bytes = 0
+    $modified = $null
+    if ($exists) {
+        $item = Get-Item $dataFile
+        $bytes = [int64]$item.Length
+        $modified = $item.LastWriteTimeUtc.ToString("o")
+        try { $count = @((Load-Notes)).Count } catch { $count = 0 }
+    }
+    return @{
+        success = $true
+        action = "disk-info"
+        exists = $exists
+        bytes = $bytes
+        noteCount = $count
+        modifiedAt = $modified
+    }
+}
+
+function Read-DiskArchiveChunk {
+    param($offset, $length)
+
+    if (-not (Test-Path $dataFile)) {
+        return @{ success = $false; error = "notlar.json bulunamadi" }
+    }
+
+    $safeOffset = [Math]::Max([int64]0, [int64]$offset)
+    $safeLength = [Math]::Max([int]1, [Math]::Min([int]$length, [int]600000))
+    $bytes = [System.IO.File]::ReadAllBytes($dataFile)
+    $total = [int64]$bytes.Length
+
+    if ($safeOffset -ge $total) {
+        return @{
+            success = $true
+            action = "disk-read"
+            offset = $safeOffset
+            nextOffset = $safeOffset
+            totalBytes = $total
+            done = $true
+            chunk = ""
+        }
+    }
+
+    $remaining = [int]([Math]::Min([int64]$safeLength, $total - $safeOffset))
+    $slice = New-Object byte[] $remaining
+    [System.Array]::Copy($bytes, [int]$safeOffset, $slice, 0, $remaining)
+    $next = $safeOffset + $remaining
+
+    return @{
+        success = $true
+        action = "disk-read"
+        offset = $safeOffset
+        nextOffset = $next
+        totalBytes = $total
+        done = ($next -ge $total)
+        chunk = [System.Convert]::ToBase64String($slice)
+    }
+}
+
+function Get-DiskNoteCount {
+    try { return @((Load-Notes)).Count } catch { return 0 }
+}
+
+function Get-ArchiveJsonText {
+    if (Test-Path $dataFile) {
+        return [System.IO.File]::ReadAllText($dataFile, [System.Text.Encoding]::UTF8)
+    }
+    $data = [ordered]@{
+        app = "Tibbi Not Defteri"
+        version = "1.1.0"
+        savedAt = (Get-Date -Format "o")
+        noteCount = 0
+        notes = @()
+    }
+    return ($data | ConvertTo-Json -Depth 10)
+}
+
+function Read-SyncConfig {
+    $cfg = [ordered]@{ token = ""; gistId = ""; fileName = $syncFileName }
+    if (Test-Path $syncConfigFile) {
+        try {
+            $raw = [System.IO.File]::ReadAllText($syncConfigFile, [System.Text.Encoding]::UTF8)
+            $saved = $raw | ConvertFrom-Json
+            if ($saved.token) { $cfg.token = [string]$saved.token }
+            if ($saved.gistId) { $cfg.gistId = [string]$saved.gistId }
+            if ($saved.fileName) { $cfg.fileName = [string]$saved.fileName }
+        } catch {}
+    }
+    return $cfg
+}
+
+function Save-SyncConfig {
+    param($cfg)
+    $safe = [ordered]@{
+        token = [string]$cfg.token
+        gistId = [string]$cfg.gistId
+        fileName = $(if ($cfg.fileName) { [string]$cfg.fileName } else { $syncFileName })
+        updatedAt = (Get-Date -Format "o")
+    }
+    $json = $safe | ConvertTo-Json -Compress
+    [System.IO.File]::WriteAllText($syncConfigFile, $json, [System.Text.Encoding]::UTF8)
+}
+
+function Get-SyncConfigResponse {
+    param([switch]$IncludeToken)
+    $cfg = Read-SyncConfig
+    $resp = [ordered]@{
+        success = $true
+        action = "sync-config"
+        hasToken = -not [string]::IsNullOrWhiteSpace($cfg.token)
+        gistId = [string]$cfg.gistId
+        fileName = $(if ($cfg.fileName) { [string]$cfg.fileName } else { $syncFileName })
+        diskCount = Get-DiskNoteCount
+    }
+    if ($IncludeToken) { $resp.token = [string]$cfg.token }
+    return $resp
+}
+
+function Invoke-GitHubJson {
+    param(
+        [string]$Method,
+        [string]$Uri,
+        [string]$Token,
+        $Body
+    )
+    if ([string]::IsNullOrWhiteSpace($Token)) { throw "GitHub token yok." }
+    $headers = @{
+        Authorization = "Bearer $Token"
+        Accept = "application/vnd.github+json"
+        "X-GitHub-Api-Version" = "2022-11-28"
+        "User-Agent" = "TibbiNotDefteri"
+    }
+    $params = @{
+        Uri = $Uri
+        Method = $Method
+        Headers = $headers
+        UseBasicParsing = $true
+        ErrorAction = "Stop"
+    }
+    if ($null -ne $Body) {
+        $params.ContentType = "application/json; charset=utf-8"
+        $params.Body = ($Body | ConvertTo-Json -Depth 20)
+    }
+    return Invoke-RestMethod @params
+}
+
+function Push-DiskArchiveToGist {
+    param([switch]$CreateIfMissing)
+    $cfg = Read-SyncConfig
+    if ([string]::IsNullOrWhiteSpace($cfg.token)) { throw "GitHub token kayitli degil." }
+
+    $fileName = if ($cfg.fileName) { [string]$cfg.fileName } else { $syncFileName }
+    $archive = Get-ArchiveJsonText
+    $files = @{}
+    $files[$fileName] = @{ content = $archive }
+
+    if ([string]::IsNullOrWhiteSpace($cfg.gistId)) {
+        if (-not $CreateIfMissing) { throw "Gist ID yok." }
+        $body = [ordered]@{
+            description = "Tibbi Not Defteri - notlar"
+            public = $false
+            files = $files
+        }
+        $created = Invoke-GitHubJson -Method "Post" -Uri "https://api.github.com/gists" -Token $cfg.token -Body $body
+        $cfg.gistId = [string]$created.id
+        $cfg.fileName = $fileName
+        Save-SyncConfig $cfg
+    } else {
+        $body = [ordered]@{ files = $files }
+        Invoke-GitHubJson -Method "Patch" -Uri ("https://api.github.com/gists/" + $cfg.gistId) -Token $cfg.token -Body $body | Out-Null
+    }
+
+    return [ordered]@{
+        success = $true
+        action = "sync-pushed-disk"
+        gistId = [string]$cfg.gistId
+        fileName = $fileName
+        diskCount = Get-DiskNoteCount
+    }
+}
+
+# ============================================================
+# ARSIV KORUMASI: gelen notlari mevcut dosyayla BIRLESTIR (ezme yok)
+# id'ye gore birlesim; ayni id'de daha yeni updatedAt kazanir;
+# silmeler tombstone (deleted:true) ile tasinir.
+# Boylece uzanti reinstall/temizlenince notlar TOPLU SILINMEZ.
+# ============================================================
+function Get-NoteTicks($n) {
+    $s = $null
+    if ($n.PSObject.Properties['updatedAt'] -and $n.updatedAt) { $s = $n.updatedAt }
+    elseif ($n.PSObject.Properties['createdAt'] -and $n.createdAt) { $s = $n.createdAt }
+    if (-not $s) { return [int64]0 }
+    try { return [System.DateTimeOffset]::Parse($s, [System.Globalization.CultureInfo]::InvariantCulture).UtcTicks }
+    catch { return [int64]0 }
+}
+
+function Merge-NotesById($existing, $incoming) {
+    $byId = [ordered]@{}
+    foreach ($n in @($existing)) { if ($n -and $n.id) { $byId[[string]$n.id] = $n } }
+    foreach ($r in @($incoming)) {
+        if (-not $r -or -not $r.id) { continue }
+        $k = [string]$r.id
+        if (-not $byId.Contains($k)) { $byId[$k] = $r; continue }
+        # Gelen (uzantinin guncel hali) daha yeni veya esitse onu al
+        if ((Get-NoteTicks $r) -ge (Get-NoteTicks $byId[$k])) { $byId[$k] = $r }
+    }
+    return @($byId.Values)
+}
+
 # Ana döngü - Chrome mesajlarını dinle
 while ($true) {
     try {
@@ -101,15 +314,49 @@ while ($true) {
         
         switch ($message.action) {
             "save" {
-                Save-Notes $message.notes
-                Send-Message @{ success = $true; action = "saved"; count = $message.notes.Count }
+                # ARSIV KORUMASI: ezme degil, birlestir
+                $existing = Load-Notes
+                $merged = Merge-NotesById $existing $message.notes
+                Save-Notes $merged
+                Send-Message @{ success = $true; action = "saved"; count = @($merged).Count }
             }
             "load" {
                 $notes = Load-Notes
                 Send-Message @{ success = $true; action = "loaded"; notes = $notes }
             }
+            "disk-info" {
+                Send-Message (Get-DiskArchiveInfo)
+            }
+            "disk-read" {
+                Send-Message (Read-DiskArchiveChunk $message.offset $message.length)
+            }
             "ping" {
                 Send-Message @{ success = $true; action = "pong" }
+            }
+            "sync-get-config" {
+                Send-Message (Get-SyncConfigResponse -IncludeToken)
+            }
+            "sync-set-config" {
+                $cfg = Read-SyncConfig
+                if ($message.PSObject.Properties['token'] -and -not [string]::IsNullOrWhiteSpace([string]$message.token)) {
+                    $cfg.token = [string]$message.token
+                }
+                if ($message.PSObject.Properties['gistId']) {
+                    $cfg.gistId = [string]$message.gistId
+                }
+                if ($message.PSObject.Properties['fileName'] -and -not [string]::IsNullOrWhiteSpace([string]$message.fileName)) {
+                    $cfg.fileName = [string]$message.fileName
+                }
+                if (-not $cfg.fileName) { $cfg.fileName = $syncFileName }
+                Save-SyncConfig $cfg
+                Send-Message (Get-SyncConfigResponse -IncludeToken)
+            }
+            "sync-clear-config" {
+                if (Test-Path $syncConfigFile) { Remove-Item $syncConfigFile -Force -ErrorAction SilentlyContinue }
+                Send-Message @{ success = $true; action = "sync-cleared"; hasToken = $false; gistId = ""; fileName = $syncFileName; diskCount = (Get-DiskNoteCount) }
+            }
+            "sync-push-disk" {
+                Send-Message (Push-DiskArchiveToGist -CreateIfMissing)
             }
             default {
                 Send-Message @{ success = $false; error = "Unknown action" }

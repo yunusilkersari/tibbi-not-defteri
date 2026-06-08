@@ -14,7 +14,7 @@
     selectedDate: null,
     calendarYear: new Date().getFullYear(),
     calendarMonth: new Date().getMonth(),
-    activeFilter: 'today',
+    activeFilter: window.__DEFTER_DESKTOP__ ? 'all' : 'today',
     activeTag: null,
     searchQuery: '',
     editingNoteId: null,
@@ -132,11 +132,18 @@
   // ==========================================
   async function init() {
     await loadPreferences();
+    syncFilterButtons();
     updateTopbar();
     renderCalendar();
     await refreshAll();
     bindEvents();
     checkDiskError();
+  }
+
+  function syncFilterButtons() {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === state.activeFilter);
+    });
   }
 
   // ==========================================

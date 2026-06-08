@@ -35,7 +35,8 @@
     .field { margin-bottom: 12px; }
     .field:last-child { margin-bottom: 0; }
     label { display: block; font-size: 12px; color: rgba(228,228,231,0.55); margin-bottom: 4px; }
-    input[type="text"] {
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
       padding: 9px 12px;
       background: #13151d;
@@ -46,8 +47,10 @@
       font-size: 13px;
       outline: none;
     }
-    input[type="text"]:focus { border-color: rgba(0,212,170,0.5); }
-    input[type="text"]::placeholder { color: rgba(228,228,231,0.3); }
+    input[type="text"]:focus,
+    input[type="password"]:focus { border-color: rgba(0,212,170,0.5); }
+    input[type="text"]::placeholder,
+    input[type="password"]::placeholder { color: rgba(228,228,231,0.3); }
     .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     .btn {
       padding: 10px 20px;
@@ -71,6 +74,7 @@
     .btn-primary:hover { box-shadow: 0 4px 20px rgba(0,212,170,0.3); }
     .status { margin-top: 14px; text-align: right; font-size: 13px; color: #00d4aa; min-height: 20px; }
     .hint { font-size: 12px; color: rgba(228,228,231,0.4); margin-top: 6px; }
+    .sync-status { margin-top: 12px; font-size: 13px; color: #00d4aa; min-height: 20px; }
   </style>
 </head>
 <body>
@@ -104,6 +108,29 @@
       </div>
       <div class="hint">
         <strong>Kilit:</strong> Yukarıdaki bir yanıtı okurken alttan soru gönderince sayfa seni aşağı çekmez. Kendi kaydırman (fare tekeri, kaydırma çubuğu, klavye) her zaman serbesttir; yalnızca <em>sitenin</em> akış sırasında alta çekmesi engellenir. Yeni yanıtlara inmek için "⤓ Yeni yanıtlara git" butonunu kullan.
+      </div>
+    </div>
+
+    <div class="platform" style="margin-bottom:22px;">
+      <h2>Bulut Senkron (PC + Telefon)</h2>
+      <div class="hint" style="margin-bottom:12px;">
+        GitHub Gist ile notlarinizi PC uzantisi, masaustu defter ve telefon PWA arasinda senkronlar.
+        Token native host'ta kalici saklanir; uzantiyi kaldirip yeniden yukleseniz de ayar geri gelir.
+      </div>
+      <div class="field">
+        <label>GitHub Token (yalnizca gist izinli)</label>
+        <input type="password" id="syncToken" placeholder="ghp_... veya github_pat_..." autocomplete="off">
+        <div class="hint" id="syncTokenHint">Kayitli token yok.</div>
+      </div>
+      <div class="field">
+        <label>Gist ID (ilk kurulumda bos birakabilirsiniz)</label>
+        <input type="text" id="syncGistId" placeholder="Bos birakilirsa PC arsivinden ozel Gist olusturulur">
+      </div>
+      <div class="sync-status" id="syncStatusText">Durum: kapali</div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="syncDisconnectBtn" class="btn btn-secondary" type="button">Baglantiyi Kes</button>
+        <button id="syncNowBtn" class="btn btn-secondary" type="button">Simdi Senkronla</button>
+        <button id="syncSaveBtn" class="btn btn-primary" type="button">Baglan / Kaydet</button>
       </div>
     </div>
 

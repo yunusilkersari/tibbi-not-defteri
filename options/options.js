@@ -117,3 +117,94 @@ function escapeHtml(text) {
 function escapeAttr(text) {
   return escapeHtml(text).replace(/"/g, '&quot;');
 }
+
+// ==========================================
+// Bulut Senkron Ayarlari
+// ==========================================
+function sendBg(message) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      resolve(response || { success: false, error: 'Yanit alinamadi' });
+    });
+  });
+}
+
+function syncLabel(status) {
+  status = status || { state: 'kapali' };
+  const labels = {
+    kapali: 'kapali',
+    senkron: 'senkronlaniyor...',
+    tamam: 'senkron acik',
+    hata: 'hata'
+  };
+  let label = labels[status.state] || status.state || 'bilinmiyor';
+  if (status.state === 'tamam' && status.lastSync) {
+    label += ' - son: ' + new Date(status.lastSync).toLocaleString('tr-TR');
+  }
+  if (status.state === 'hata' && status.error) label += ': ' + status.error;
+  return label;
+}
+
+function renderSyncInfo(info) {
+  const tokenInput = document.getElementById('syncToken');
+  const gistInput = document.getElementById('syncGistId');
+  const tokenHint = document.getElementById('syncTokenHint');
+  const statusText = document.getElementById('syncStatusText');
+  if (!tokenInput || !gistInput || !tokenHint || !statusText) return;
+
+  gistInput.value = (info && info.gistId) || '';
+  tokenInput.value = '';
+  tokenInput.placeholder = info && info.hasToken
+    ? '(kayitli - degistirmek icin yeni token girin)'
+    : 'ghp_... veya github_pat_...';
+  tokenHint.textContent = info && info.hasToken
+    ? 'Token native host tarafinda kayitli.'
+    : 'Kayitli token yok.';
+  statusText.textContent = 'Durum: ' + syncLabel(info && info.status);
+}
+
+async function loadSyncInfo() {
+  const info = await sendBg({ action: 'sync-get-status' });
+  renderSyncInfo(info);
+  return info;
+}
+
+function initCloudSyncSettings() {
+  const saveBtn = document.getElementById('syncSaveBtn');
+  const nowBtn = document.getElementById('syncNowBtn');
+  const disconnectBtn = document.getElementById('syncDisconnectBtn');
+  if (!saveBtn || !nowBtn || !disconnectBtn) return;
+
+  loadSyncInfo();
+
+  saveBtn.addEventListener('click', async () => {
+    const token = document.getElementById('syncToken').value.trim();
+    const gistId = document.getElementById('syncGistId').value.trim();
+    saveBtn.disabled = true;
+    document.getElementById('syncStatusText').textContent = 'Durum: senkronlaniyor...';
+    const result = await sendBg({ action: 'sync-set-config', data: { token, gistId } });
+    renderSyncInfo(result);
+    if (!result.success) showStatus('Bulut senkron hatasi: ' + (result.error || 'bilinmeyen hata'));
+    else showStatus('Bulut senkron kaydedildi.');
+    saveBtn.disabled = false;
+  });
+
+  nowBtn.addEventListener('click', async () => {
+    nowBtn.disabled = true;
+    document.getElementById('syncStatusText').textContent = 'Durum: senkronlaniyor...';
+    const result = await sendBg({ action: 'sync-now' });
+    renderSyncInfo(result);
+    if (!result.success) showStatus('Senkron hatasi: ' + (result.error || 'bilinmeyen hata'));
+    else showStatus('Senkron tamamlandi.');
+    nowBtn.disabled = false;
+  });
+
+  disconnectBtn.addEventListener('click', async () => {
+    if (!confirm('Bulut baglantisi kesilsin mi? Notlar yerelde kalir, yalnizca otomatik senkron durur.')) return;
+    const result = await sendBg({ action: 'sync-disconnect' });
+    renderSyncInfo(result);
+    showStatus('Bulut baglantisi kesildi.');
+  });
+}
+
+initCloudSyncSettings();

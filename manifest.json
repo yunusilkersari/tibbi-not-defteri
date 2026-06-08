@@ -9,7 +9,8 @@
     "unlimitedStorage",
     "activeTab",
     "contextMenus",
-    "nativeMessaging"
+    "nativeMessaging",
+    "alarms"
   ],
 
   "host_permissions": ["<all_urls>"],

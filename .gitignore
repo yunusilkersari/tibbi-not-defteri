@@ -13,6 +13,10 @@ desktop/*-result.json
 desktop/*-result.txt
 desktop/verify-data.json
 desktop/diag-data.json
+desktop/sync-config.json
+desktop/sync-status.json
+.desktop-runtime/
+desktop/runtime/
 
 # Derleme çıktıları (paketlenmiş sürümler) ve yerel dev dosyaları
 dist/
