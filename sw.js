@@ -6,7 +6,7 @@
 // - "stale-while-revalidate": önce önbellekten gösterir, arka planda
 //   yeni sürümü indirip önbelleği günceller.
 // ============================================================
-var CACHE = 'tibbi-defter-v2';
+var CACHE = 'tibbi-defter-v3';
 
 // Uygulama kabuğu (kökten göreli yollar; alt klasör barındırmada da çalışır)
 var CORE = [

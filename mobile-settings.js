@@ -27,6 +27,75 @@
   function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
   function closeDrawer() { if (sidebar) sidebar.classList.add('collapsed'); }
 
+  // ---------- Mobile read font size ----------
+  var FONT_KEY = 'defterMobileReadFontSize';
+  var FONT_MIN = 15;
+  var FONT_MAX = 24;
+  var FONT_DEFAULT = 17;
+
+  function clampFontSize(value) {
+    value = parseInt(value, 10);
+    if (!Number.isFinite(value)) value = FONT_DEFAULT;
+    return Math.max(FONT_MIN, Math.min(FONT_MAX, value));
+  }
+
+  function getStoredFontSize() {
+    try {
+      return clampFontSize(localStorage.getItem(FONT_KEY));
+    } catch (e) {
+      return FONT_DEFAULT;
+    }
+  }
+
+  function setStoredFontSize(value) {
+    try {
+      localStorage.setItem(FONT_KEY, String(value));
+    } catch (e) {
+      // localStorage can be unavailable in some embedded contexts.
+    }
+  }
+
+  function applyReadFontSize(value) {
+    var size = clampFontSize(value);
+    document.documentElement.style.setProperty('--mobile-read-font-size', size + 'px');
+    setStoredFontSize(size);
+
+    var label = $('mobileReadFontValue');
+    if (label) label.textContent = size + 'px';
+
+    var minus = $('mobileReadFontMinus');
+    var plus = $('mobileReadFontPlus');
+    if (minus) minus.disabled = size <= FONT_MIN;
+    if (plus) plus.disabled = size >= FONT_MAX;
+  }
+
+  function mountReadFontControl() {
+    if ($('mobileReadFontControl')) return;
+    var widthControl = $('readModalWidthControl');
+    var header = widthControl ? widthControl.parentElement : null;
+    if (!header) return;
+
+    var control = document.createElement('div');
+    control.className = 'mobile-read-font-control';
+    control.id = 'mobileReadFontControl';
+    control.innerHTML =
+      '<button type="button" class="mobile-read-font-btn" id="mobileReadFontMinus" aria-label="Yaziyi kucult">A-</button>' +
+      '<span class="mobile-read-font-value" id="mobileReadFontValue"></span>' +
+      '<button type="button" class="mobile-read-font-btn" id="mobileReadFontPlus" aria-label="Yaziyi buyut">A+</button>';
+
+    widthControl.insertAdjacentElement('afterend', control);
+
+    $('mobileReadFontMinus').addEventListener('click', function () {
+      applyReadFontSize(getStoredFontSize() - 1);
+    });
+    $('mobileReadFontPlus').addEventListener('click', function () {
+      applyReadFontSize(getStoredFontSize() + 1);
+    });
+  }
+
+  mountReadFontControl();
+  applyReadFontSize(getStoredFontSize());
+
   // Açılışta telefonda sidebar kapalı başlasın (notlar öne çıksın)
   if (isMobile() && sidebar) sidebar.classList.add('collapsed');
 

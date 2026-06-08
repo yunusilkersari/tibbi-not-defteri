@@ -987,9 +987,17 @@
 
   // Direkt tam ekranda okuma
   async function openReadModalFullscreen(note) {
-    // Tam ekranı kullanıcı tıklaması HÂLÂ aktifken, modal açılmadan iste.
-    // Böylece önce pencere modu sonra fullscreen "çift açılım" olmaz —
-    // modal doğrudan tam ekranda bir kez açılır (pürüzsüz geçiş).
+    state.readAllMode = false;
+    applyReadAllChrome(false);
+    state.readModalNotes = [note];
+    state.readingNoteIndex = 0;
+    renderReadModalNote(note);
+    updateReadModalNav();
+    DOM.readModal.style.display = '';
+    focusReadModalBody();
+
+    // Mobilde arka plan gizlenmeden once modal hazir olsun; boylece
+    // fullscreen gecisinde bos ekran/parlama gorunmez.
     try {
       await document.documentElement.requestFullscreen();
       state.readModalFullscreen = true;
@@ -997,7 +1005,15 @@
     } catch (e) {
       // Tam ekran reddedilirse normal pencere modunda aç
     }
-    await openReadModal(note);
+    const allCurrentNotes = (await getCurrentNoteList())
+      .slice()
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (allCurrentNotes.length) {
+      state.readModalNotes = allCurrentNotes;
+      state.readingNoteIndex = allCurrentNotes.findIndex(n => n.id === note.id);
+      if (state.readingNoteIndex === -1) state.readingNoteIndex = 0;
+      updateReadModalNav();
+    }
   }
 
   // ==========================================
@@ -1028,6 +1044,8 @@
     applyReadAllChrome(true);
     renderReadModalNote(all[0]);
     updateReadModalNav();
+    DOM.readModal.style.display = '';
+    focusReadModalBody();
 
     // Kullanıcı tıklaması hâlâ aktifken tam ekrana geç (çift-açılım/parlama olmaz)
     try {
@@ -1037,9 +1055,6 @@
     } catch (e) {
       // tam ekran reddedilirse pencere modunda aç
     }
-
-    DOM.readModal.style.display = '';
-    focusReadModalBody();
   }
 
   // Toplu/tekil moda göre modal başlık ve "Düzenle" butonunu ayarla.
@@ -1064,9 +1079,6 @@
       }
       requestAnimationFrame(() => {
         mb.focus({ preventScroll: true });
-        // Odaktan SONRA en üste al — odaklanma kaydırmayı geri kaçırmasın
-        mb.scrollTop = 0;
-        if (content) content.scrollTop = 0;
       });
     }
   }
