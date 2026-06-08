@@ -73,36 +73,41 @@
   }
   .read-modal { width: 94vw !important; }
 
-  html:fullscreen,
-  html:-webkit-full-screen {
-    background: var(--bg-primary);
-  }
+  /* Genislik kontrolu mobilde tamamen gizli (kucuk ekranda gereksiz) */
+  .read-modal-width-control { display: none !important; }
 
-  :fullscreen #readModal .read-modal,
-  :-webkit-full-screen #readModal .read-modal {
+  /* ===== Mobilde CSS ile tam ekran okuma (native fullscreen YOK) =====
+     PWA zaten display:standalone. Native requestFullscreen yavas + siyah/beyaz
+     flash yapiyordu; app.js mobilde sadece <html>'e .reading-fs ekler -> gecis
+     aninda olur, flash yok. */
+  html.reading-fs { background: var(--bg-primary); }
+  html.reading-fs .app-layout { display: none !important; }
+  html.reading-fs .mobile-fab { display: none !important; }
+  html.reading-fs #readModal { padding: 0 !important; }
+
+  html.reading-fs #readModal .read-modal {
     width: 100vw !important;
     max-width: 100vw !important;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
     border-left: none;
     border-right: none;
+    margin: 0 !important;
+    /* Tam ekran okumada acilis animasyonu/scale OLMASIN — kenar bosluksuz,
+       aninda tam ekran (seri gecis). */
+    animation: none !important;
+    transform: none !important;
   }
 
-  :fullscreen #readModal .read-modal-width-control,
-  :-webkit-full-screen #readModal .read-modal-width-control {
-    display: none !important;
+  html.reading-fs #readModal .read-modal .modal-body {
+    max-height: none !important;
+    flex: 1 1 auto;
   }
 
-  :fullscreen .mobile-fab,
-  :-webkit-full-screen .mobile-fab,
-  .reading-fs .mobile-fab {
-    display: none !important;
-  }
-
-  :fullscreen #readModal .read-modal-meta,
-  :-webkit-full-screen #readModal .read-modal-meta {
-    display: none;
-  }
+  html.reading-fs #readModal .read-modal-meta { display: none; }
 
   .mobile-read-font-control {
     display: inline-flex;

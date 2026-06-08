@@ -993,17 +993,23 @@
     state.readingNoteIndex = 0;
     renderReadModalNote(note);
     updateReadModalNav();
-    DOM.readModal.style.display = '';
-    focusReadModalBody();
-
-    // Mobilde arka plan gizlenmeden once modal hazir olsun; boylece
-    // fullscreen gecisinde bos ekran/parlama gorunmez.
-    try {
-      await document.documentElement.requestFullscreen();
+    if (window.__DEFTER_MOBILE__) {
+      // Mobil (standalone PWA): native fullscreen YERINE CSS sinifi.
+      // Anlik gecis — siyah/beyaz flash ve yavas native gecis OLMAZ.
       state.readModalFullscreen = true;
-      updateFullscreenIcon(true);
-    } catch (e) {
-      // Tam ekran reddedilirse normal pencere modunda aç
+      updateFullscreenIcon(true);   // <html>'e 'reading-fs' ekler
+      DOM.readModal.style.display = '';
+      focusReadModalBody();
+    } else {
+      DOM.readModal.style.display = '';
+      focusReadModalBody();
+      try {
+        await document.documentElement.requestFullscreen();
+        state.readModalFullscreen = true;
+        updateFullscreenIcon(true);
+      } catch (e) {
+        // Tam ekran reddedilirse normal pencere modunda aç
+      }
     }
     const allCurrentNotes = (await getCurrentNoteList())
       .slice()
@@ -1044,16 +1050,22 @@
     applyReadAllChrome(true);
     renderReadModalNote(all[0]);
     updateReadModalNav();
-    DOM.readModal.style.display = '';
-    focusReadModalBody();
-
-    // Kullanıcı tıklaması hâlâ aktifken tam ekrana geç (çift-açılım/parlama olmaz)
-    try {
-      await document.documentElement.requestFullscreen();
+    if (window.__DEFTER_MOBILE__) {
+      // Mobil: CSS ile aninda tam ekran (native fullscreen yok — flash yok)
       state.readModalFullscreen = true;
       updateFullscreenIcon(true);
-    } catch (e) {
-      // tam ekran reddedilirse pencere modunda aç
+      DOM.readModal.style.display = '';
+      focusReadModalBody();
+    } else {
+      DOM.readModal.style.display = '';
+      focusReadModalBody();
+      try {
+        await document.documentElement.requestFullscreen();
+        state.readModalFullscreen = true;
+        updateFullscreenIcon(true);
+      } catch (e) {
+        // tam ekran reddedilirse pencere modunda aç
+      }
     }
   }
 
@@ -1160,6 +1172,13 @@
   // Document kökünü tam ekrana al — Top Layer izolasyonundan kaçınır
   // DOM ağacının tamamı erişilebilir kalır, hiçbir eleman inert olmaz
   async function enterReadFullscreen() {
+    if (window.__DEFTER_MOBILE__) {
+      // Mobil: CSS ile aninda tam ekran (native fullscreen yok)
+      state.readModalFullscreen = true;
+      updateFullscreenIcon(true);
+      focusReadModalBody();
+      return;
+    }
     try {
       await document.documentElement.requestFullscreen();
       state.readModalFullscreen = true;
@@ -1178,8 +1197,13 @@
   }
 
   function toggleReadFullscreen() {
-    if (!document.fullscreenElement) {
+    const isFull = window.__DEFTER_MOBILE__ ? state.readModalFullscreen : !!document.fullscreenElement;
+    if (!isFull) {
       enterReadFullscreen();
+    } else if (window.__DEFTER_MOBILE__) {
+      // Mobil: sinifi kaldir (pencere moduna don)
+      state.readModalFullscreen = false;
+      updateFullscreenIcon(false);
     } else {
       // Tam ekrandan çık
       document.exitFullscreen().then(() => {
@@ -1221,8 +1245,9 @@
   }
 
   function closeReadModal() {
-    // Tam ekrandaysa önce çık
-    if (document.fullscreenElement) {
+    // Masaüstü native tam ekrandaysa önce çık; mobilde 'reading-fs' sinifi
+    // finishCloseReadModal -> updateFullscreenIcon(false) ile zaten kalkar.
+    if (!window.__DEFTER_MOBILE__ && document.fullscreenElement) {
       document.exitFullscreen().then(() => {
         finishCloseReadModal();
       });
