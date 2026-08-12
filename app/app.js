@@ -762,18 +762,25 @@
     const timeStr = time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
     const dateStr = time.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
 
-    const methodLabel = CAPTURE_METHODS[note.captureMethod] || note.captureMethod;
+    const methodLabel = CAPTURE_METHODS[note.captureMethod] || note.captureMethod || 'Bilinmiyor';
 
     // Content truncation check
-    const isTruncated = note.content.length > 500;
+    const plainContent = typeof note.content === 'string' ? note.content : '';
+    const safeContentHtml = note.contentHtml ? sanitizeRichHtml(note.contentHtml) : '';
+    const isTruncated = plainContent.length > 500;
 
     let sourceHtml = '';
-    if (note.sourceUrl) {
-      const displayUrl = note.sourceTitle || new URL(note.sourceUrl).hostname;
+    const safeSourceUrl = safeExternalUrl(note.sourceUrl);
+    if (safeSourceUrl) {
+      let displayUrl = note.sourceTitle;
+      if (!displayUrl) {
+        try { displayUrl = new URL(safeSourceUrl).hostname; }
+        catch (e) { displayUrl = safeSourceUrl; }
+      }
       sourceHtml = `
         <div class="note-card-source">
           <span>🔗</span>
-          <a href="${escapeHtml(note.sourceUrl)}" target="_blank" title="${escapeHtml(note.sourceUrl)}">${escapeHtml(displayUrl)}</a>
+          <a href="${escapeHtml(safeSourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(safeSourceUrl)}">${escapeHtml(displayUrl)}</a>
         </div>
       `;
     }
@@ -796,7 +803,7 @@
       <div class="note-card-header">
         <div class="note-card-meta">
           <span class="note-card-time">${timeStr} · ${dateStr}</span>
-          <span class="note-card-method">${methodLabel}</span>
+          <span class="note-card-method">${escapeHtml(methodLabel)}</span>
         </div>
         <div class="note-card-actions">
           <button class="note-card-action star-btn ${note.isStarred ? 'starred' : ''}" data-action="star" title="Yıldızla">
@@ -811,7 +818,7 @@
           <button class="note-card-action delete-btn" data-action="delete" title="Sil">🗑️</button>
         </div>
       </div>
-      <div class="note-card-content ${isTruncated ? 'truncated' : ''}">${note.contentHtml ? note.contentHtml : escapeHtml(note.content)}</div>
+      <div class="note-card-content ${isTruncated ? 'truncated' : ''}">${safeContentHtml || escapeHtml(plainContent)}</div>
       ${isTruncated ? '<button class="note-card-expand visible" data-action="expand">Devamını göster ↓</button>' : ''}
       ${userNoteHtml}
       <div class="note-card-footer">
@@ -871,7 +878,7 @@
     state.editingNoteId = note.id;
     // Zengin metin editörü: varsa HTML, yoksa düz metni satır sonlarıyla göster
     DOM.editContent.innerHTML = note.contentHtml
-      ? note.contentHtml
+      ? sanitizeRichHtml(note.contentHtml)
       : escapeHtml(note.content || '').replace(/\n/g, '<br>');
     DOM.editUserNote.value = note.userNote || '';
     DOM.editTags.value = (note.tags || []).join(', ');
@@ -1107,7 +1114,7 @@
     DOM.readModalMeta.style.cssText = 'font-size:12px; color:var(--accent-primary); font-weight:500;';
 
     if (note.contentHtml) {
-      DOM.readModalContent.innerHTML = note.contentHtml;
+      DOM.readModalContent.innerHTML = sanitizeRichHtml(note.contentHtml);
     } else {
       DOM.readModalContent.textContent = note.content;
     }
@@ -1130,9 +1137,10 @@
       DOM.readModalUserNote.style.display = 'none';
     }
 
-    if (note.sourceUrl) {
+    const safeSourceUrl = safeExternalUrl(note.sourceUrl);
+    if (safeSourceUrl) {
       DOM.readModalSource.style.display = 'block';
-      DOM.readModalSource.innerHTML = `🔗 <a href="${escapeHtml(note.sourceUrl)}" target="_blank" style="color:var(--accent-primary); text-decoration:none;">${escapeHtml(note.sourceTitle || note.sourceUrl)}</a>`;
+      DOM.readModalSource.innerHTML = `🔗 <a href="${escapeHtml(safeSourceUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-primary); text-decoration:none;">${escapeHtml(note.sourceTitle || safeSourceUrl)}</a>`;
     } else {
       DOM.readModalSource.style.display = 'none';
     }
@@ -1415,7 +1423,7 @@
       const d = new Date(n.createdAt);
       const meta = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
                    ' · ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-      const content = n.contentHtml ? n.contentHtml : escapeHtml(n.content || '').replace(/\n/g, '<br>');
+      const content = n.contentHtml ? sanitizeRichHtml(n.contentHtml) : escapeHtml(n.content || '').replace(/\n/g, '<br>');
       const tags = (n.tags && n.tags.length) ? `<div class="pt-tags">${n.tags.map(t => '#' + escapeHtml(t)).join(' ')}</div>` : '';
       const src = n.sourceUrl ? `<div class="pt-src">Kaynak: ${escapeHtml(n.sourceTitle || n.sourceUrl)}</div>` : '';
       const un = n.userNote ? `<div class="pt-un">💬 ${escapeHtml(n.userNote)}</div>` : '';
@@ -1541,8 +1549,20 @@
   // ==========================================
   function escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text == null ? '' : String(text);
     return div.innerHTML;
+  }
+
+  // Not kaynakları yalnızca normal web bağlantısı olabilir. İçe aktarılan
+  // javascript:/data: URL'lerini ve bozuk adresleri tıklanabilir yapma.
+  function safeExternalUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    try {
+      const parsed = new URL(value);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '';
+    } catch (e) {
+      return '';
+    }
   }
 
   // Zengin editör HTML'ini güvenli biçim etiketleriyle sınırla
@@ -1564,11 +1584,17 @@
       Array.from(el.attributes).forEach((attr) => {
         const n = attr.name.toLowerCase();
         const v = (attr.value || '').trim();
-        // a[href] ve img[src] (javascript: hariç) ve temel stil kalsın
-        if (el.tagName === 'A' && n === 'href' && !/^\s*(javascript|vbscript):/i.test(v)) return;
-        if (el.tagName === 'IMG' && (n === 'src' || n === 'alt') && !/^\s*(javascript|vbscript):/i.test(v)) return;
+        // Yalnız güvenli bağlantılar, görseller ve sunum için sınırlı nitelikler.
+        if (el.tagName === 'A' && n === 'href' && safeExternalUrl(v)) return;
+        if (el.tagName === 'IMG' && n === 'alt') return;
+        if (el.tagName === 'IMG' && n === 'src' && /^(https?:|data:image\/(?:png|jpeg|gif|webp);base64,)/i.test(v)) return;
+        if ((el.tagName === 'TH' || el.tagName === 'TD') && (n === 'colspan' || n === 'rowspan') && /^\d{1,2}$/.test(v)) return;
         el.removeAttribute(attr.name);
       });
+      if (el.tagName === 'A') {
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noopener noreferrer');
+      }
     });
     return tmp.innerHTML;
   }

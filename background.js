@@ -147,6 +147,26 @@ function _visible(notes) {
   return (notes || []).filter(n => n && !n.deleted);
 }
 
+// Aynı updatedAt değerine sahip iki farklı kayıt nadiren de olsa cihazlar
+// arasında oluşabilir. Nesne anahtar sırasından bağımsız, deterministik bir
+// bağlayıcı kullanarak bütün istemcilerin aynı kaydı seçmesini sağla.
+function _canonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(_canonical).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort()
+      .map(k => JSON.stringify(k) + ':' + _canonical(value[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+function _newerRecord(a, b) {
+  const at = Date.parse((a && (a.updatedAt || a.createdAt)) || 0) || 0;
+  const bt = Date.parse((b && (b.updatedAt || b.createdAt)) || 0) || 0;
+  if (at !== bt) return bt > at ? b : a;
+  if (!!a.deleted !== !!b.deleted) return b.deleted ? b : a;
+  return _canonical(b) > _canonical(a) ? b : a;
+}
+
 // chrome.storage'daki HAM notlar (tombstone'lar DAHİL) — diske/buluta giderken kullanılır
 async function _rawNotes() {
   const r = await chrome.storage.local.get(['notes']);
@@ -161,9 +181,7 @@ function _mergeById(localArr, incomingArr) {
     if (!r || !r.id) return;
     const l = byId[r.id];
     if (!l) { byId[r.id] = r; return; }
-    const lt = Date.parse(l.updatedAt || l.createdAt || 0) || 0;
-    const rt = Date.parse(r.updatedAt || r.createdAt || 0) || 0;
-    if (rt >= lt) byId[r.id] = r;
+    byId[r.id] = _newerRecord(l, r);
   });
   return Object.keys(byId).map(k => byId[k])
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -171,7 +189,7 @@ function _mergeById(localArr, incomingArr) {
 
 // İçerik imzası (sıra-bağımsız değişiklik tespiti)
 function _sig(arr) {
-  return (arr || []).map(n => n.id + ':' + (n.updatedAt || n.createdAt || '') + ':' + (n.deleted ? '1' : '0')).sort().join('|');
+  return (arr || []).map(_canonical).sort().join('|');
 }
 
 // ==========================================

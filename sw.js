@@ -6,8 +6,8 @@
 // - "stale-while-revalidate": önce önbellekten gösterir, arka planda
 //   yeni sürümü indirip önbelleği günceller.
 // ============================================================
-// v7 (2026-08-09): senkron kendi sunucumuza taşındı ve Redmi/dar ekran
-// üst çubuk yerleşimi güncellendi.
+// v7 (2026-08-12): veri doğrulama, güvenli HTML gösterimi ve deterministik
+// senkron birleştirmesi eklendi; eski uygulama kabuğu kullanılmamalı.
 // Sürüm numarasını artırmak eski önbelleği siler → telefonlar yeni
 // mobile-shim.js'i almadan eski Gist koduyla çalışmaya devam edemez.
 var CACHE = 'tibbi-defter-v7';

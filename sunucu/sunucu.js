@@ -86,6 +86,25 @@ function zaman(n) {
   return Date.parse((n && (n.updatedAt || n.createdAt)) || 0) || 0;
 }
 
+function kanonik(deger) {
+  if (Array.isArray(deger)) return '[' + deger.map(kanonik).join(',') + ']';
+  if (deger && typeof deger === 'object') {
+    return '{' + Object.keys(deger).sort()
+      .map(k => JSON.stringify(k) + ':' + kanonik(deger[k])).join(',') + '}';
+  }
+  return JSON.stringify(deger);
+}
+
+function yeniKayit(a, b) {
+  const at = zaman(a);
+  const bt = zaman(b);
+  if (at !== bt) return bt > at ? b : a;
+  // Eşit zamanda silme her zaman kazanır; aksi halde kanonik içerik
+  // bağlayıcısı birleşmeyi sıra ve cihazdan bağımsız yapar.
+  if (!!a.deleted !== !!b.deleted) return b.deleted ? b : a;
+  return kanonik(b) > kanonik(a) ? b : a;
+}
+
 // istemcideki mobile-shim.js `_merge` ile BİREBİR aynı kural
 function birlestir(mevcut, gelen) {
   const idye = Object.create(null);
@@ -94,7 +113,7 @@ function birlestir(mevcut, gelen) {
     if (!g || !g.id) continue;
     const m = idye[g.id];
     if (!m) { idye[g.id] = g; continue; }
-    idye[g.id] = zaman(g) > zaman(m) ? g : m;
+    idye[g.id] = yeniKayit(m, g);
   }
   const cikti = Object.keys(idye).map(k => idye[k]);
   cikti.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -109,6 +128,32 @@ function paket(notlar) {
     noteCount: notlar.length,
     notes: notlar
   };
+}
+
+function notPaketiniDogrula(notlar) {
+  if (!Array.isArray(notlar)) return 'notes dizisi bulunamadı';
+  const kimlikler = new Set();
+  for (let i = 0; i < notlar.length; i++) {
+    const n = notlar[i];
+    const sira = i + 1;
+    if (!n || typeof n !== 'object' || Array.isArray(n)) return `${sira}. kayıt nesne değil`;
+    if (typeof n.id !== 'string' || !n.id.trim() || n.id.length > 200) return `${sira}. kaydın id alanı geçersiz`;
+    if (kimlikler.has(n.id)) return `${sira}. kaydın id alanı yineleniyor`;
+    kimlikler.add(n.id);
+    if (typeof n.createdAt !== 'string' || !Number.isFinite(Date.parse(n.createdAt))) {
+      return `${sira}. kaydın createdAt alanı geçersiz`;
+    }
+    if (typeof n.updatedAt !== 'string' || !Number.isFinite(Date.parse(n.updatedAt))) {
+      return `${sira}. kaydın updatedAt alanı geçersiz`;
+    }
+    if (n.deleted === true) continue;
+    if (typeof n.content !== 'string') return `${sira}. kaydın content alanı geçersiz`;
+    if (n.contentHtml != null && typeof n.contentHtml !== 'string') return `${sira}. kaydın contentHtml alanı geçersiz`;
+    if (n.tags != null && (!Array.isArray(n.tags) || n.tags.some(t => typeof t !== 'string'))) {
+      return `${sira}. kaydın tags alanı geçersiz`;
+    }
+  }
+  return null;
 }
 
 async function notlariOku() {
@@ -229,9 +274,8 @@ const sunucu = http.createServer(async (req, res) => {
       } catch {
         return json(res, 400, { hata: 'Geçersiz JSON' });
       }
-      if (!Array.isArray(gelen)) {
-        return json(res, 400, { hata: 'notes dizisi bulunamadı' });
-      }
+      const dogrulamaHatasi = notPaketiniDogrula(gelen);
+      if (dogrulamaHatasi) return json(res, 400, { hata: dogrulamaHatasi });
 
       const sonuc = await sirayaAl(async () => {
         const mevcut = await notlariOku();

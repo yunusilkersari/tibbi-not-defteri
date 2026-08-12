@@ -122,6 +122,13 @@ async function yaz(notlar) {
       body: JSON.stringify({ baska: 1 })
     });
     sina('notes dizisi yoksa → 400', dizisiz.status === 400, `dönen: ${dizisiz.status}`);
+    const bozukKayit = await yaz([{ id: '', content: 42 }]);
+    sina('bozuk not kaydı → 400', bozukKayit.kod === 400, `dönen: ${bozukKayit.kod}`);
+    const yinelenen = await yaz([
+      not('ayni', '2026-01-01T00:00:00.000Z'),
+      not('ayni', '2026-01-02T00:00:00.000Z')
+    ]);
+    sina('aynı pakette yinelenen id → 400', yinelenen.kod === 400, `dönen: ${yinelenen.kod}`);
     d = await al();
     sina('bozuk istekler veriyi bozmadı', d.notes.length === 3, `kalan: ${d.notes.length}`);
 
@@ -130,6 +137,27 @@ async function yaz(notlar) {
       yaz([not('es' + i, '2026-08-0' + (i + 1) + 'T00:00:00.000Z')])));
     d = await al();
     sina('8 eşzamanlı yazımın hepsi korundu', d.notes.length === 11, `bulunan: ${d.notes.length}`);
+
+    console.log('\n=== 10. Eşit zaman damgası deterministik birleşir ===');
+    const esit1 = not('esit', '2026-08-10T00:00:00.000Z', { content: 'A' });
+    const esit2 = not('esit', '2026-08-10T00:00:00.000Z', { content: 'B' });
+    await yaz([esit1]);
+    await yaz([esit2]);
+    d = await al();
+    const ilkKazanan = d.notes.find(n => n.id === 'esit').content;
+    await yaz([esit1, esit2]);
+    d = await al();
+    sina('eşit updatedAt sonucu gönderim sırasından bağımsız',
+         d.notes.find(n => n.id === 'esit').content === ilkKazanan);
+
+    const esitTombstone = {
+      id: 'esit', createdAt: esit1.createdAt,
+      updatedAt: esit1.updatedAt, deleted: true
+    };
+    await yaz([esitTombstone]);
+    d = await al();
+    sina('eşit updatedAt durumunda tombstone kazanır',
+         d.notes.find(n => n.id === 'esit').deleted === true);
 
   } finally {
     cocuk.kill();

@@ -305,6 +305,24 @@
   // ============================================================
   function _ts(n) { return Date.parse(n && (n.updatedAt || n.createdAt) || 0) || 0; }
 
+  function _canonical(value) {
+    if (Array.isArray(value)) return '[' + value.map(_canonical).join(',') + ']';
+    if (value && typeof value === 'object') {
+      return '{' + Object.keys(value).sort().map(function (k) {
+        return JSON.stringify(k) + ':' + _canonical(value[k]);
+      }).join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  function _newerRecord(a, b) {
+    var at = _ts(a);
+    var bt = _ts(b);
+    if (at !== bt) return bt > at ? b : a;
+    if (!!a.deleted !== !!b.deleted) return b.deleted ? b : a;
+    return _canonical(b) > _canonical(a) ? b : a;
+  }
+
   function _merge(localArr, remoteArr) {
     var byId = {};
     localArr.forEach(function (n) { if (n && n.id) byId[n.id] = n; });
@@ -312,7 +330,7 @@
       if (!r || !r.id) return;
       var l = byId[r.id];
       if (!l) { byId[r.id] = r; return; }
-      byId[r.id] = (_ts(r) > _ts(l)) ? r : l;
+      byId[r.id] = _newerRecord(l, r);
     });
     var out = Object.keys(byId).map(function (k) { return byId[k]; });
     // En yeni üstte (app.js sırayı korur)
