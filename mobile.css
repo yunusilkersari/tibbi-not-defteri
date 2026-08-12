@@ -54,6 +54,30 @@
 @media (max-width: 768px) {
   .mobile-fab { display: flex; }
 
+  /* Dar telefonlarda üst çubuk elemanları flex tarafından ezilmesin.
+     Redmi Note 15 Pro'nun dikey CSS genişliğinde (yaklaşık 393 px)
+     varsayılan masaüstü boşlukları tarih ve menü düğmesini kesiyordu. */
+  .topbar {
+    gap: 8px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+  .topbar-menu-btn,
+  .topbar-icon-btn,
+  .topbar-theme-toggle,
+  .topbar-note-count {
+    flex-shrink: 0;
+  }
+  .topbar-actions { gap: 6px; }
+  .topbar-date-day {
+    font-size: 20px;
+    white-space: nowrap;
+  }
+
+  /* PWA zaten bağımsız pencere olarak açılır. Mobilde tarayıcı tam ekran
+     düğmesi gereksiz yer kaplıyor; okuma tam ekranı kendi düğmesinde kalır. */
+  #topbarFullscreen { display: none; }
+
   /* Sidebar bir çekmece gibi davransın; üstte kalsın */
   .sidebar { z-index: 100; }
 
@@ -167,7 +191,12 @@
   .topbar-date-full { display: none; }
 
   /* Not kartları biraz daha sıkı */
-  .notes-container { padding: 14px; padding-bottom: 90px; }
+  .notes-container {
+    height: calc(100dvh - var(--topbar-height));
+    max-height: calc(100dvh - var(--topbar-height));
+    padding: 14px;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
 
   /* iOS'ta input'a tıklayınca otomatik zoom olmasın diye 16px taban */
   .modal-input,
@@ -175,6 +204,12 @@
   .search-input {
     font-size: 16px;
   }
+}
+
+/* 430 px ve altında toplam not sayısı çekmecedeki istatistikte zaten
+   görülebilir. Üstte saklamak tarih için güvenli dokunma alanı bırakır. */
+@media (max-width: 430px) {
+  .topbar-note-count { display: none; }
 }
 
 /* Çok dar ekran (küçük telefonlar) */

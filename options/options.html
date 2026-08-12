@@ -112,19 +112,25 @@
     </div>
 
     <div class="platform" style="margin-bottom:22px;">
-      <h2>Bulut Senkron (PC + Telefon)</h2>
+      <h2>Sunucu Senkronu (PC + Telefon)</h2>
       <div class="hint" style="margin-bottom:12px;">
-        GitHub Gist ile notlarinizi PC uzantisi, masaustu defter ve telefon PWA arasinda senkronlar.
-        Token native host'ta kalici saklanir; uzantiyi kaldirip yeniden yukleseniz de ayar geri gelir.
+        Notlarinizi kendi sunucunuz uzerinden PC uzantisi, masaustu defter ve telefon
+        arasinda senkronlar. Sunucu tek gercek kaynaktir: bir cihazda eklenen not
+        digerlerine gider, silinen not geri dirilmez. Sunucu gelen notlari kendindekiyle
+        BIRLESTIRDIGI icin bos/bayat bir cihaz arsivi silemez.
       </div>
       <div class="field">
-        <label>GitHub Token (yalnizca gist izinli)</label>
-        <input type="password" id="syncToken" placeholder="ghp_... veya github_pat_..." autocomplete="off">
-        <div class="hint" id="syncTokenHint">Kayitli token yok.</div>
+        <label>Sunucu adresi</label>
+        <input type="text" id="syncSunucuUrl" placeholder="https://186-240-153-193.sslip.io" autocomplete="off">
+        <div class="hint" id="syncSunucuHint">Kayitli sunucu yok.</div>
       </div>
       <div class="field">
-        <label>Gist ID (ilk kurulumda bos birakabilirsiniz)</label>
-        <input type="text" id="syncGistId" placeholder="Bos birakilirsa PC arsivinden ozel Gist olusturulur">
+        <label>Kullanici adi</label>
+        <input type="text" id="syncKullanici" placeholder="yunus" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Parola</label>
+        <input type="password" id="syncParola" placeholder="sunucu giris parolasi" autocomplete="off">
       </div>
       <div class="sync-status" id="syncStatusText">Durum: kapali</div>
       <div class="actions" style="margin-top:12px;">

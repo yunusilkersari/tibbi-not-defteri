@@ -120,13 +120,15 @@
   // ============================================================
   // Senkron ayar penceresi
   // ============================================================
+  // 2026-08-09: Gist kurulumu (token + Gist ID) KALKTI. Defter kendi
+  // sunucusundan servis edildiği için senkron kendiliğinden açık; ayar
+  // penceresinde girilecek bir şey kalmadı, yalnız durum + elle senkron var.
   var modal = $('syncModal');
   function openModal() {
     if (!SYNC) return;
     var info = SYNC.getInfo();
-    $('syncGistId').value = info.gistId || '';
-    $('syncToken').value = '';
-    $('syncToken').placeholder = info.hasToken ? '(kayıtlı — değiştirmek için yeni gir)' : 'ghp_… veya github_pat_…';
+    var alan = $('syncSunucu');
+    if (alan) alan.value = info.adres || location.origin;
     renderStatus(info.status);
     modal.style.display = 'flex';
   }
@@ -137,53 +139,13 @@
   $('syncModalClose').addEventListener('click', closeModal);
   modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
 
-  // Bağlan / kaydet
-  $('syncSaveBtn').addEventListener('click', function () {
-    var token = $('syncToken').value.trim();
-    var gistId = $('syncGistId').value.trim();
-    var info = SYNC.getInfo();
-
-    if (!token && !info.hasToken) {
-      alert('Lütfen önce GitHub token girin (yalnızca "gist" izinli).');
-      return;
-    }
-    // Token boş ama kayıtlıysa: sadece yeniden senkronla
-    if (!token && info.hasToken) {
-      SYNC.syncNow();
-      closeModal();
-      return;
-    }
-    $('syncSaveBtn').disabled = true;
-    SYNC.setConfig({ token: token, gistId: gistId })
-      .then(function () {
-        var i = SYNC.getInfo();
-        $('syncGistId').value = i.gistId || '';
-        if (i.status && i.status.state === 'hata') {
-          alert('Bağlanılamadı: ' + (i.status.error || 'bilinmeyen hata') +
-                '\n\nToken doğru mu ve "gist" izni var mı kontrol edin.');
-        } else {
-          alert('Bağlandı! ✓\nGist ID kaydedildi. Diğer cihazda da aynı Gist ID + token ile bağlanabilirsiniz.');
-          closeModal();
-        }
-      })
-      .catch(function (e) { alert('Hata: ' + e.message); })
-      .finally(function () { $('syncSaveBtn').disabled = false; });
-  });
-
   // Şimdi senkronla
   $('syncNowBtn').addEventListener('click', function () {
-    if (!SYNC.isConfigured()) { alert('Önce bağlanın.'); return; }
-    SYNC.syncNow();
-  });
-
-  // Bağlantıyı kes
-  $('syncDisconnectBtn').addEventListener('click', function () {
-    if (!confirm('Bulut bağlantısı kesilsin mi? Notlar telefonda kalır, sadece senkron durur.')) return;
-    SYNC.disconnect().then(function () {
-      $('syncToken').value = '';
-      $('syncGistId').value = '';
-      renderStatus({ state: 'kapali' });
-    });
+    var btn = $('syncNowBtn');
+    btn.disabled = true;
+    Promise.resolve(SYNC.syncNow()).then(function () {
+      btn.disabled = false;
+    }, function () { btn.disabled = false; });
   });
 
   // ============================================================
@@ -197,10 +159,10 @@
     hata: 'var(--accent-danger)'
   };
   var LABELS = {
-    kapali: 'kapalı (yalnızca telefonda)',
+    kapali: 'beklemede',
     cevrimdisi: 'çevrimdışı — internet gelince senkronlanır',
     senkron: 'senkronlanıyor…',
-    tamam: 'senkron açık ✓',
+    tamam: 'sunucuyla senkron ✓',
     hata: 'hata'
   };
 

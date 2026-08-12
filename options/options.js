@@ -146,20 +146,23 @@ function syncLabel(status) {
 }
 
 function renderSyncInfo(info) {
-  const tokenInput = document.getElementById('syncToken');
-  const gistInput = document.getElementById('syncGistId');
-  const tokenHint = document.getElementById('syncTokenHint');
+  const urlInput = document.getElementById('syncSunucuUrl');
+  const kullaniciInput = document.getElementById('syncKullanici');
+  const parolaInput = document.getElementById('syncParola');
+  const hint = document.getElementById('syncSunucuHint');
   const statusText = document.getElementById('syncStatusText');
-  if (!tokenInput || !gistInput || !tokenHint || !statusText) return;
+  if (!urlInput || !kullaniciInput || !parolaInput || !hint || !statusText) return;
 
-  gistInput.value = (info && info.gistId) || '';
-  tokenInput.value = '';
-  tokenInput.placeholder = info && info.hasToken
-    ? '(kayitli - degistirmek icin yeni token girin)'
-    : 'ghp_... veya github_pat_...';
-  tokenHint.textContent = info && info.hasToken
-    ? 'Token native host tarafinda kayitli.'
-    : 'Kayitli token yok.';
+  const kurulu = !!(info && info.configured);
+  urlInput.value = (info && info.sunucuUrl) || '';
+  kullaniciInput.value = (info && info.kullanici) || '';
+  parolaInput.value = '';
+  parolaInput.placeholder = kurulu
+    ? '(kayitli - degistirmek icin yeni parola girin)'
+    : 'sunucu giris parolasi';
+  hint.textContent = kurulu
+    ? 'Sunucu kayitli: ' + info.sunucuUrl
+    : 'Kayitli sunucu yok.';
   statusText.textContent = 'Durum: ' + syncLabel(info && info.status);
 }
 
@@ -178,14 +181,18 @@ function initCloudSyncSettings() {
   loadSyncInfo();
 
   saveBtn.addEventListener('click', async () => {
-    const token = document.getElementById('syncToken').value.trim();
-    const gistId = document.getElementById('syncGistId').value.trim();
+    const sunucuUrl = document.getElementById('syncSunucuUrl').value.trim();
+    const kullanici = document.getElementById('syncKullanici').value.trim();
+    const parola = document.getElementById('syncParola').value.trim();
     saveBtn.disabled = true;
     document.getElementById('syncStatusText').textContent = 'Durum: senkronlaniyor...';
-    const result = await sendBg({ action: 'sync-set-config', data: { token, gistId } });
+    const result = await sendBg({
+      action: 'sync-set-config',
+      data: { sunucuUrl, kullanici, parola }
+    });
     renderSyncInfo(result);
-    if (!result.success) showStatus('Bulut senkron hatasi: ' + (result.error || 'bilinmeyen hata'));
-    else showStatus('Bulut senkron kaydedildi.');
+    if (!result.success) showStatus('Sunucu senkron hatasi: ' + (result.error || 'bilinmeyen hata'));
+    else showStatus('Sunucu senkronu kaydedildi.');
     saveBtn.disabled = false;
   });
 

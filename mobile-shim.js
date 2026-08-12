@@ -11,9 +11,19 @@
 //
 // Masaüstünden FARKI (kalıcılık):
 //   - Notlar telefonun IndexedDB'sinde tutulur (ÇEVRİMDIŞI çalışır).
-//   - İsteğe bağlı bulut: özel bir GitHub Gist ile çift yönlü senkron.
+//   - Bulut: KENDİ SUNUCUMUZ ile çift yönlü senkron (/api/notlar).
 //   - Silmeler "tombstone" (deleted:true) ile işaretlenir → bir cihazda
 //     silinen not diğerinden geri DİRİLMEZ. app.js bunları hiç görmez.
+//
+// 2026-08-09 — GitHub Gist BIRAKILDI, yerine kendi sunucumuz geldi. Neden:
+//   · Defter artık sunucudan servis ediliyor → istek AYNI KÖKENE gidiyor,
+//     bu yüzden istemcide token/parola TUTULMUYOR. Kimlik doğrulamayı
+//     sunucunun kendi giriş kapısı (Caddy) yapıyor.
+//   · Gist'te PUSH körü körüne üzerine yazıyordu: boş IndexedDB'li bir cihaz
+//     tüm arşivi silebilirdi. Sunucu artık gelen notları DEPODAKİYLE
+//     BİRLEŞTİRİYOR ve birleşmiş sonucu döndürüyor → veri kaybı yolu kapalı.
+//   · Gist'in 1 MB kesme (truncated) derdi ve kişisel token bağımlılığı bitti.
+// Birleştirme kuralı, tombstone mantığı ve çevrimdışı davranış AYNEN korundu.
 //
 // Bu script, app/storage.js ve app/app.js'den ÖNCE yüklenmelidir.
 // ============================================================
@@ -68,18 +78,18 @@
   // 1) Durum
   // ============================================================
   var _notes = [];          // tombstone'lar DAHİL (deleted:true olanlar burada durur)
-  var _config = null;       // { token, gistId, fileName }
   var _changeListeners = [];
 
   var _idbSaveTimer = null;
-  var _gistPushTimer = null;
+  var _gonderTimer = null;
   var _pollTimer = null;
-  var _lastGistContent = null; // son çekilen ham içerik (gereksiz birleşmeyi önler)
 
   var _status = { state: 'kapali', lastSync: null, error: null }; // senkron durumu
   var _statusListeners = [];
 
-  var GIST_FILE = 'notlar.json';
+  // Defter sunucudan servis edildiği için GÖRELİ yol yeterli — hangi adresten
+  // açılırsa açılsın (sslip.io, kendi alan adın, localhost) doğru yere gider.
+  var API = 'api/notlar';
 
   // ============================================================
   // 2) Veri mantığı — background.js / desktop-shim ile birebir aynı
@@ -187,11 +197,9 @@
       _idbSet('notes', _notes).catch(function (e) { console.warn('IDB kayıt hatası', e); });
     }, 150);
 
-    // Buluta gönder (daha uzun debounce — gereksiz istek olmasın)
-    if (_config && _config.token && _config.gistId) {
-      clearTimeout(_gistPushTimer);
-      _gistPushTimer = setTimeout(function () { _gistPush(); }, 1500);
-    }
+    // Sunucuya gönder (daha uzun debounce — gereksiz istek olmasın)
+    clearTimeout(_gonderTimer);
+    _gonderTimer = setTimeout(function () { _sunucuyaGonder(); }, 1500);
   }
 
   // ============================================================
@@ -315,7 +323,7 @@
   }
 
   // ============================================================
-  // 6) GitHub Gist senkronu
+  // 6) Sunucu senkronu (/api/notlar)
   // ============================================================
   function _setStatus(state, error) {
     _status = { state: state, lastSync: _status.lastSync, error: error || null };
@@ -323,157 +331,94 @@
     _statusListeners.forEach(function (cb) { try { cb(_status); } catch (e) {} });
   }
 
-  function _headers() {
-    return {
-      'Authorization': 'Bearer ' + _config.token,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28'
-    };
-  }
-
-  function _notesPayload() {
+  function _paket() {
     return JSON.stringify({
       app: 'Tıbbi Not Defteri',
-      version: '1.0-mobile',
+      version: '2.0-sunucu',
       updatedAt: new Date().toISOString(),
       notes: _notes
-    }, null, 2);
+    });
   }
 
-  function _parseGistNotes(text) {
-    try {
-      var data = JSON.parse(text);
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.notes)) return data.notes;
-    } catch (e) {}
+  function _gelenNotlar(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.notes)) return data.notes;
     return [];
   }
 
-  // Buluttan çek + birleştir
-  function _gistPull() {
-    if (!_config || !_config.token || !_config.gistId) return Promise.resolve(false);
-    if (!navigator.onLine) return Promise.resolve(false);
+  // Sunucudan gelen listeyi yereldekiyle birleştirip kaydet.
+  // (Sunucu da kendi tarafında birleştirir; bu ikinci kapı, çevrimdışıyken
+  //  eklenmiş yerel notların gelen cevapla EZİLMEMESİ içindir.)
+  function _benimse(uzak) {
+    var birlesik = _merge(_notes, uzak);
+    var degisti = JSON.stringify(birlesik) !== JSON.stringify(_notes);
+    _notes = birlesik;
+    return _idbSet('notes', _notes).then(function () {
+      if (degisti) _emitNotesChanged();
+      _setStatus('tamam');
+      return degisti;
+    });
+  }
+
+  // Sunucudan çek + birleştir
+  function _sunucudanCek() {
+    if (!navigator.onLine) { _setStatus('cevrimdisi'); return Promise.resolve(false); }
     _setStatus('senkron');
-    return fetch('https://api.github.com/gists/' + _config.gistId, { headers: _headers() })
+    return fetch(API, { cache: 'no-store' })
       .then(function (res) {
-        if (!res.ok) throw new Error('Gist okunamadı (HTTP ' + res.status + ')');
+        if (!res.ok) throw new Error('Sunucu okunamadı (HTTP ' + res.status + ')');
         return res.json();
       })
-      .then(function (gist) {
-        var file = gist.files && gist.files[_config.fileName || GIST_FILE];
-        if (!file) return false;
-        // Büyük dosyalarda content kesilmiş olabilir → raw_url'den al
-        var getText = file.truncated && file.raw_url
-          ? fetch(file.raw_url).then(function (r) { return r.text(); })
-          : Promise.resolve(file.content || '');
-        return getText.then(function (text) {
-          if (text === _lastGistContent) { _setStatus('tamam'); return false; }
-          _lastGistContent = text;
-          var remote = _parseGistNotes(text);
-          var merged = _merge(_notes, remote);
-          var changed = JSON.stringify(merged) !== JSON.stringify(_notes);
-          _notes = merged;
-          return _idbSet('notes', _notes).then(function () {
-            if (changed) _emitNotesChanged();
-            _setStatus('tamam');
-            return changed;
-          });
-        });
-      })
+      .then(function (d) { return _benimse(_gelenNotlar(d)); })
       .catch(function (e) { _setStatus('hata', e.message); return false; });
   }
 
-  // Buluta yaz
-  function _gistPush() {
-    if (!_config || !_config.token || !_config.gistId) return Promise.resolve(false);
+  // Sunucuya yaz — sunucu BİRLEŞTİRİP sonucu döndürür, onu benimseriz.
+  // Bu yüzden ayrıca "çek" gerekmez: tek gidiş-dönüşte iki yön de tamamlanır.
+  function _sunucuyaGonder() {
     if (!navigator.onLine) { _setStatus('cevrimdisi'); return Promise.resolve(false); }
     _setStatus('senkron');
-    var body = { files: {} };
-    body.files[_config.fileName || GIST_FILE] = { content: _notesPayload() };
-    return fetch('https://api.github.com/gists/' + _config.gistId, {
-      method: 'PATCH',
-      headers: _headers(),
-      body: JSON.stringify(body)
-    }).then(function (res) {
-      if (!res.ok) throw new Error('Gist yazılamadı (HTTP ' + res.status + ')');
-      _lastGistContent = _notesPayload();
-      _setStatus('tamam');
-      return true;
-    }).catch(function (e) { _setStatus('hata', e.message); return false; });
-  }
-
-  // İlk kurulumda: token var ama gistId yok → yeni özel gist oluştur
-  function _gistCreate() {
-    _setStatus('senkron');
-    var body = {
-      description: 'Tıbbi Not Defteri — notlar (özel)',
-      public: false,
-      files: {}
-    };
-    body.files[GIST_FILE] = { content: _notesPayload() };
-    return fetch('https://api.github.com/gists', {
-      method: 'POST',
-      headers: _headers(),
-      body: JSON.stringify(body)
-    }).then(function (res) {
-      if (!res.ok) throw new Error('Gist oluşturulamadı (HTTP ' + res.status + ')');
-      return res.json();
-    }).then(function (gist) {
-      _config.gistId = gist.id;
-      _config.fileName = GIST_FILE;
-      return _idbSet('gistConfig', _config).then(function () {
-        _lastGistContent = _notesPayload();
-        _setStatus('tamam');
-        return gist.id;
-      });
-    }).catch(function (e) { _setStatus('hata', e.message); throw e; });
+    return fetch(API, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: _paket()
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Sunucuya yazılamadı (HTTP ' + res.status + ')');
+        return res.json();
+      })
+      .then(function (d) { return _benimse(_gelenNotlar(d)); })
+      .catch(function (e) { _setStatus('hata', e.message); return false; });
   }
 
   function _startPolling() {
     if (_pollTimer) clearInterval(_pollTimer);
-    if (!_config || !_config.token || !_config.gistId) return;
     _pollTimer = setInterval(function () {
       if (document.hidden) return; // arka plandayken boşuna isteme
-      _gistPull();
+      _sunucudanCek();
     }, 20000); // 20 sn
   }
 
   function _fullSync() {
-    // Önce çek-birleştir, sonra yereldeki birleşmiş hali geri yaz
-    return _gistPull().then(function () { return _gistPush(); });
+    // Gönderme zaten birleştirip sonucu getiriyor → tek çağrı yeter
+    return _sunucuyaGonder();
   }
 
   // ============================================================
   // 7) Ayar arayüzü için dışa açılan API (mobile-settings.js kullanır)
   // ============================================================
   window.__DEFTER_SYNC__ = {
-    isConfigured: function () { return !!(_config && _config.token && _config.gistId); },
+    // Defter kendi sunucusundan servis ediliyor → senkron HER ZAMAN açıktır,
+    // kurulacak token/kimlik yok. (Şekil korundu ki mobile-settings.js bozulmasın.)
+    isConfigured: function () { return true; },
     getInfo: function () {
-      return {
-        hasToken: !!(_config && _config.token),
-        gistId: (_config && _config.gistId) || '',
-        status: _status
-      };
+      return { sunucu: true, adres: location.origin, status: _status };
     },
-    // { token, gistId? } — gistId boşsa yeni gist oluşturur
-    setConfig: function (opts) {
-      opts = opts || {};
-      _config = {
-        token: (opts.token || '').trim(),
-        gistId: (opts.gistId || '').trim(),
-        fileName: GIST_FILE
-      };
-      return _idbSet('gistConfig', _config).then(function () {
-        if (!_config.token) { _setStatus('kapali'); return; }
-        var step = _config.gistId ? _fullSync() : _gistCreate().then(function () { return _gistPush(); });
-        return step.then(function () { _startPolling(); });
-      });
-    },
+    setConfig: function () { return _fullSync(); },   // geriye uyumluluk
     disconnect: function () {
-      _config = null;
       if (_pollTimer) clearInterval(_pollTimer);
       _setStatus('kapali');
-      return _idbSet('gistConfig', null);
+      return Promise.resolve();
     },
     syncNow: function () { return _fullSync(); },
     onStatus: function (cb) { if (typeof cb === 'function') _statusListeners.push(cb); }
@@ -483,29 +428,25 @@
   // 8) Açılış: IndexedDB'den yükle → app.js'i tazele → buluttan çek
   // ============================================================
   (function boot() {
-    Promise.all([_idbGet('notes'), _idbGet('gistConfig')]).then(function (vals) {
-      var savedNotes = vals[0];
-      var savedConfig = vals[1];
+    _idbGet('notes').then(function (savedNotes) {
       if (Array.isArray(savedNotes)) {
         _notes = savedNotes;
         _emitNotesChanged(); // app.js DOMContentLoaded'da boş başlasa bile burada dolar
       }
-      if (savedConfig && savedConfig.token) {
-        _config = savedConfig;
-        _setStatus('tamam');
-        _gistPull().then(function () { _startPolling(); });
-      } else {
-        _setStatus('kapali');
-      }
+      // Yerelde not varsa TAM senkron (çevrimdışıyken eklenenler de yukarı
+      // gitsin — yalnız "çek" deseydik bir sonraki değişikliğe kadar telefonda
+      // mahsur kalırlardı). Yerel BOŞSA gönderecek bir şey yok: sadece çek.
+      // (Boş liste göndermek zararsız — sunucu birleştirdiği için veri silinmez
+      //  — ama gereksiz; ilk açılışta boşuna gidiş-dönüş yapmayalım.)
+      var ilkAdim = _notes.length ? _fullSync() : _sunucudanCek();
+      return ilkAdim.then(function () { _startPolling(); });
     }).catch(function (e) { console.warn('Mobil shim açılış hatası', e); });
 
     // Çevrimiçi olunca bir kez senkronla
-    window.addEventListener('online', function () {
-      if (window.__DEFTER_SYNC__.isConfigured()) _fullSync();
-    });
+    window.addEventListener('online', function () { _fullSync(); });
     // Sekme tekrar öne gelince taze veriyi çek
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden && window.__DEFTER_SYNC__.isConfigured()) _gistPull();
+      if (!document.hidden) _sunucudanCek();
     });
   })();
 

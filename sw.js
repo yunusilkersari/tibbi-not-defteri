@@ -2,11 +2,15 @@
 // Tıbbi Not Defteri — Service Worker (çevrimdışı çalışma)
 // ------------------------------------------------------------
 // - Uygulama kabuğunu önbelleğe alır → internetsiz açılır.
-// - GitHub API (senkron) İSTEKLERİNİ ASLA önbelleğe almaz; hep canlı.
+// - Senkron İSTEKLERİNİ (/api/…) ASLA önbelleğe almaz; hep canlı.
 // - "stale-while-revalidate": önce önbellekten gösterir, arka planda
 //   yeni sürümü indirip önbelleği günceller.
 // ============================================================
-var CACHE = 'tibbi-defter-v5';
+// v7 (2026-08-09): senkron kendi sunucumuza taşındı ve Redmi/dar ekran
+// üst çubuk yerleşimi güncellendi.
+// Sürüm numarasını artırmak eski önbelleği siler → telefonlar yeni
+// mobile-shim.js'i almadan eski Gist koduyla çalışmaya devam edemez.
+var CACHE = 'tibbi-defter-v7';
 
 // Uygulama kabuğu (kökten göreli yollar; alt klasör barındırmada da çalışır)
 var CORE = [
@@ -52,8 +56,10 @@ self.addEventListener('fetch', function (e) {
 
   var url = new URL(req.url);
 
-  // GitHub API (senkron) ve diğer API çağrıları → ASLA önbellek, hep ağ
-  if (url.hostname === 'api.github.com' || url.hostname === 'gist.githubusercontent.com') {
+  // Senkron API'si → ASLA önbellek, HEP ağ.
+  // (Önbelleğe alınsaydı telefon bayat not listesi gösterirdi; PUT zaten
+  //  yukarıda eleniyor ama GET /api/notlar buradan geçmeliydi.)
+  if (/\/api\//.test(url.pathname)) {
     return; // tarayıcı normal ağ isteğini yapsın
   }
 

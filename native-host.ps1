@@ -174,6 +174,15 @@ function Get-ArchiveJsonText {
     return ($data | ConvertTo-Json -Depth 10)
 }
 
+# ============================================================
+# ⚠ 2026-08-09 — AŞAĞIDAKİ GIST BLOĞU ARTIK ÖLÜ KODDUR.
+# Bulut senkronu GitHub Gist'ten kendi sunucumuza taşındı; uzantı artık
+# "sync-get-config" / "sync-set-config" / "sync-push-disk" mesajlarını HİÇ
+# GÖNDERMİYOR (bkz. background.js → sunucuAyariniYukle, chrome.storage'da).
+# Bu fonksiyonlar çağrılmıyor; SİLİNMEDİ çünkü native host'un asıl işi
+# (Save-Notes / Load-Notes / arşiv okuma) aynı dosyada ve dokunmak gereksiz
+# risk. Yeni senkron kodu buraya EKLENMEZ — sunucu tarafındadır.
+# ============================================================
 function Read-SyncConfig {
     $cfg = [ordered]@{ token = ""; gistId = ""; fileName = $syncFileName }
     if (Test-Path $syncConfigFile) {

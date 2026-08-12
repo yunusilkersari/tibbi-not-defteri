@@ -340,27 +340,24 @@
   <div class="modal-overlay" id="syncModal" style="display:none">
     <div class="modal modal-sm">
       <div class="modal-header">
-        <h2 class="modal-title">☁️ Bulut Senkron</h2>
+        <h2 class="modal-title">☁️ Sunucu Senkronu</h2>
         <button class="modal-close" id="syncModalClose">✕</button>
       </div>
       <div class="modal-body">
-        <p class="modal-text" id="syncStatusText" style="margin-bottom:14px;">Durum: kapalı</p>
+        <p class="modal-text" id="syncStatusText" style="margin-bottom:14px;">Durum: —</p>
         <div class="modal-field">
-          <label class="modal-label">GitHub Token (yalnızca "gist" izinli)</label>
-          <input type="password" class="modal-input" id="syncToken" placeholder="ghp_… veya github_pat_…" autocomplete="off">
+          <label class="modal-label">Bağlı sunucu</label>
+          <input type="text" class="modal-input" id="syncSunucu" readonly>
           <small style="color:var(--text-tertiary); font-size:11px; display:block; margin-top:6px;">
-            Token yalnızca <strong>bu telefonda</strong> saklanır, hiçbir yere gönderilmez.
+            Defter bu sunucudan açıldığı için senkron <strong>her zaman açıktır</strong> —
+            ayrıca kurulum yapman ya da anahtar girmen gerekmez.
+            Notlar telefonda da saklanır: internet yokken defter çalışmaya devam eder,
+            bağlantı gelince kendiliğinden senkronlanır.
           </small>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Gist ID (boş bırak → otomatik oluşturulur)</label>
-          <input type="text" class="modal-input" id="syncGistId" placeholder="(ilk kurulumda boş bırakın)" autocomplete="off">
         </div>
       </div>
       <div class="modal-footer">
-        <button class="modal-btn modal-btn-danger" id="syncDisconnectBtn" style="margin-right:auto;">Bağlantıyı Kes</button>
-        <button class="modal-btn modal-btn-secondary" id="syncNowBtn">🔄 Şimdi Senkronla</button>
-        <button class="modal-btn modal-btn-primary" id="syncSaveBtn">💾 Bağlan</button>
+        <button class="modal-btn modal-btn-primary" id="syncNowBtn" style="margin-left:auto;">🔄 Şimdi Senkronla</button>
       </div>
     </div>
   </div>

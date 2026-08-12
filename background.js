@@ -398,7 +398,6 @@ async function updateBadge() {
 // ==========================================
 
 const NATIVE_HOST_NAME = 'com.tibbi.notdefteri';
-const GIST_FILE_NAME = 'notlar.json';
 
 let cloudConfig = null;
 let cloudStatus = { state: 'kapali', lastSync: null, error: null };
@@ -514,18 +513,35 @@ async function rawNotesWithDiskRestore() {
   return second.notes || [];
 }
 
-async function loadNativeSyncConfig(force = false) {
+// ------------------------------------------------------------
+// 2026-08-09 — BULUT SENKRONU GITHUB GIST'TEN KENDI SUNUCUMUZA TASINDI.
+//
+// Neden:
+//   · Tek gercek kaynak artik sunucu (~/tibbi-defter/data/notlar.json).
+//     Telefon da bu uzanti da ayni yere yazar → cihazlar birbirinden kopmaz.
+//   · Gist'te PUSH koru korune uzerine yaziyordu; bos depolu bir istemci tum
+//     arsivi silebilirdi. Sunucu artik gelen notlari depodakiyle BIRLESTIRIP
+//     birlesmis sonucu donduruyor → veri kaybi yolu kapali.
+//   · Gist'in 1 MB kesme derdi ve kisisel token bagimliligi bitti.
+//
+// Ayar artik native host'ta (data/sync-config.json) DEGIL, chrome.storage'da:
+//   { sunucuUrl, kullanici, parola }
+// Boylece native-host.ps1 tarafinda Gist'e ozel kod tasimaya gerek kalmadi.
+// ------------------------------------------------------------
+const SUNUCU_AYAR_ANAHTARI = 'sunucuAyar';
+
+async function sunucuAyariniYukle(force = false) {
   if (cloudConfig && !force) return cloudConfig;
-  const response = await nativeMessage({ action: 'sync-get-config' });
-  if (!response || !response.success) {
+  const kayit = await chrome.storage.local.get([SUNUCU_AYAR_ANAHTARI]);
+  const a = kayit[SUNUCU_AYAR_ANAHTARI];
+  if (!a || !a.sunucuUrl || !a.kullanici || !a.parola) {
     cloudConfig = null;
     return null;
   }
   cloudConfig = {
-    token: response.token || '',
-    gistId: response.gistId || '',
-    fileName: response.fileName || GIST_FILE_NAME,
-    diskCount: response.diskCount || 0
+    sunucuUrl: String(a.sunucuUrl).trim().replace(/\/+$/, ''),  // sondaki / temizle
+    kullanici: a.kullanici,
+    parola: a.parola
   };
   return cloudConfig;
 }
@@ -533,64 +549,51 @@ async function loadNativeSyncConfig(force = false) {
 function cloudPublicStatus(extra = {}) {
   return {
     success: true,
-    configured: !!(cloudConfig && cloudConfig.token && cloudConfig.gistId),
-    hasToken: !!(cloudConfig && cloudConfig.token),
-    gistId: (cloudConfig && cloudConfig.gistId) || '',
-    fileName: (cloudConfig && cloudConfig.fileName) || GIST_FILE_NAME,
-    diskCount: (cloudConfig && cloudConfig.diskCount) || 0,
+    configured: !!(cloudConfig && cloudConfig.sunucuUrl),
+    sunucuUrl: (cloudConfig && cloudConfig.sunucuUrl) || '',
+    kullanici: (cloudConfig && cloudConfig.kullanici) || '',
     status: cloudStatus,
     ...extra
   };
 }
 
 async function getCloudSyncStatus() {
-  await loadNativeSyncConfig(true);
-  if (cloudConfig && cloudConfig.token && cloudConfig.gistId) {
+  await sunucuAyariniYukle(true);
+  if (cloudConfig && cloudConfig.sunucuUrl) {
     ensureCloudAlarm();
   }
   return cloudPublicStatus();
 }
 
 async function setCloudSyncConfig(data) {
-  await loadNativeSyncConfig(true);
-  const token = (data.token || '').trim();
-  const gistId = (data.gistId || '').trim();
-  if (!token && !(cloudConfig && cloudConfig.token)) {
-    return { success: false, error: 'GitHub token gerekli.' };
+  await sunucuAyariniYukle(true);
+  const sunucuUrl = (data.sunucuUrl || '').trim().replace(/\/+$/, '');
+  const kullanici = (data.kullanici || '').trim();
+  // Parola bos birakildiysa ve zaten kayitliysa: mevcut parolayi koru.
+  // (Ayar sayfasina parolayi GERI GONDERMIYORUZ; bos gelmesi normaldir.)
+  const parola = (data.parola || '').trim() || (cloudConfig && cloudConfig.parola) || '';
+
+  if (!sunucuUrl || !kullanici || !parola) {
+    return { success: false, error: 'Sunucu adresi, kullanici adi ve parola gerekli.' };
+  }
+  if (!/^https:\/\//i.test(sunucuUrl)) {
+    // Notlar tibbi icerik — sifresiz http ile tasinmasin.
+    return { success: false, error: 'Sunucu adresi https:// ile baslamali.' };
   }
 
   setCloudStatus('senkron');
-  const saved = await nativeMessage({
-    action: 'sync-set-config',
-    token,
-    gistId,
-    fileName: GIST_FILE_NAME
-  });
-  if (!saved || !saved.success) {
-    setCloudStatus('hata', (saved && saved.error) || 'Senkron ayari kaydedilemedi.');
-    return { success: false, error: cloudStatus.error, status: cloudStatus };
+  cloudConfig = { sunucuUrl, kullanici, parola };
+
+  // Once baglantiyi SINA; calismiyorsa ayari kaydetme (sessiz bozuk kurulum olmasin)
+  try {
+    await fetchCloudNotes();
+  } catch (err) {
+    cloudConfig = null;
+    setCloudStatus('hata', err.message);
+    return { success: false, error: err.message, status: cloudStatus };
   }
 
-  cloudConfig = {
-    token: saved.token || token || (cloudConfig && cloudConfig.token) || '',
-    gistId: saved.gistId || '',
-    fileName: saved.fileName || GIST_FILE_NAME,
-    diskCount: saved.diskCount || 0
-  };
-
-  // Ilk kurulum: Gist ID bos ise mevcut PC arsivini native host dogrudan
-  // Gist'e yukler. Boylece 2MB+ notlar extension'a native mesajla donmez.
-  if (!cloudConfig.gistId) {
-    const pushed = await nativeMessage({ action: 'sync-push-disk' });
-    if (!pushed || !pushed.success) {
-      setCloudStatus('hata', (pushed && pushed.error) || 'Gist olusturulamadi.');
-      return { success: false, error: cloudStatus.error, status: cloudStatus };
-    }
-    cloudConfig.gistId = pushed.gistId || '';
-    cloudConfig.fileName = pushed.fileName || GIST_FILE_NAME;
-    cloudConfig.diskCount = pushed.diskCount || cloudConfig.diskCount || 0;
-  }
-
+  await chrome.storage.local.set({ [SUNUCU_AYAR_ANAHTARI]: cloudConfig });
   ensureCloudAlarm();
   return cloudFullSync({ reason: 'config' });
 }
@@ -598,27 +601,39 @@ async function setCloudSyncConfig(data) {
 async function disconnectCloudSync() {
   clearTimeout(cloudPushTimeout);
   cloudConfig = null;
-  await nativeMessage({ action: 'sync-clear-config' });
+  await chrome.storage.local.remove(SUNUCU_AYAR_ANAHTARI);
   try { chrome.alarms.clear('cloud-sync'); } catch (e) {}
   setCloudStatus('kapali');
-  return cloudPublicStatus({ configured: false, hasToken: false, gistId: '' });
+  return cloudPublicStatus({ configured: false });
+}
+
+// UTF-8 guvenli base64 (btoa tek basina Turkce karakterde patlar)
+function _b64(metin) {
+  const baytlar = new TextEncoder().encode(metin);
+  let ikili = '';
+  baytlar.forEach((b) => { ikili += String.fromCharCode(b); });
+  return btoa(ikili);
 }
 
 function cloudHeaders() {
+  // Sunucunun giris kapisi (Caddy) HTTP Basic bekliyor.
   return {
-    'Authorization': 'Bearer ' + cloudConfig.token,
-    'Accept': 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28'
+    'Authorization': 'Basic ' + _b64(cloudConfig.kullanici + ':' + cloudConfig.parola),
+    'Accept': 'application/json'
   };
+}
+
+function apiUrl() {
+  return cloudConfig.sunucuUrl + '/api/notlar';
 }
 
 function notesPayload(notes) {
   return JSON.stringify({
     app: 'Tibbi Not Defteri',
-    version: '1.3.0-cloud',
+    version: '2.0-sunucu',
     updatedAt: new Date().toISOString(),
     notes
-  }, null, 2);
+  });
 }
 
 function parseCloudNotes(text) {
@@ -631,37 +646,25 @@ function parseCloudNotes(text) {
 }
 
 async function fetchCloudNotes() {
-  if (!cloudConfig || !cloudConfig.token || !cloudConfig.gistId) return [];
-  const res = await fetch('https://api.github.com/gists/' + cloudConfig.gistId, {
-    headers: cloudHeaders()
-  });
-  if (!res.ok) throw new Error('Gist okunamadi (HTTP ' + res.status + ')');
-  const gist = await res.json();
-  const files = gist.files || {};
-  const fileName = cloudConfig.fileName || GIST_FILE_NAME;
-  const file = files[fileName] || Object.values(files).find(f => f && f.filename && f.filename.endsWith('.json'));
-  if (!file) return [];
-  let text = file.content || '';
-  if (file.truncated && file.raw_url) {
-    const raw = await fetch(file.raw_url, { cache: 'no-store' });
-    if (!raw.ok) throw new Error('Gist ham dosya okunamadi (HTTP ' + raw.status + ')');
-    text = await raw.text();
-  }
-  return parseCloudNotes(text);
+  if (!cloudConfig || !cloudConfig.sunucuUrl) return [];
+  const res = await fetch(apiUrl(), { headers: cloudHeaders(), cache: 'no-store' });
+  if (res.status === 401) throw new Error('Sunucu girisi reddetti — kullanici adi veya parola yanlis.');
+  if (!res.ok) throw new Error('Sunucu okunamadi (HTTP ' + res.status + ')');
+  return parseCloudNotes(await res.text());
 }
 
+// Sunucu gelen notlari depodakiyle BIRLESTIRIR ve birlesmis listeyi doner.
+// Bu yuzden ayrica "cek" gerekmez; donen liste dogrudan benimsenebilir.
 async function pushCloudNotes(notes) {
-  if (!cloudConfig || !cloudConfig.token || !cloudConfig.gistId) return false;
-  const fileName = cloudConfig.fileName || GIST_FILE_NAME;
-  const body = { files: {} };
-  body.files[fileName] = { content: notesPayload(notes) };
-  const res = await fetch('https://api.github.com/gists/' + cloudConfig.gistId, {
-    method: 'PATCH',
-    headers: cloudHeaders(),
-    body: JSON.stringify(body)
+  if (!cloudConfig || !cloudConfig.sunucuUrl) return null;
+  const res = await fetch(apiUrl(), {
+    method: 'PUT',
+    headers: { ...cloudHeaders(), 'Content-Type': 'application/json' },
+    body: notesPayload(notes)
   });
-  if (!res.ok) throw new Error('Gist yazilamadi (HTTP ' + res.status + ')');
-  return true;
+  if (res.status === 401) throw new Error('Sunucu girisi reddetti — kullanici adi veya parola yanlis.');
+  if (!res.ok) throw new Error('Sunucuya yazilamadi (HTTP ' + res.status + ')');
+  return parseCloudNotes(await res.text());
 }
 
 async function saveMergedNotes(notes) {
@@ -674,41 +677,30 @@ async function cloudFullSync({ reason = 'auto' } = {}) {
   if (cloudSyncPromise) return cloudSyncPromise;
   cloudSyncPromise = (async () => {
     try {
-      await loadNativeSyncConfig();
-      if (!cloudConfig || !cloudConfig.token) {
+      await sunucuAyariniYukle();
+      if (!cloudConfig || !cloudConfig.sunucuUrl) {
         setCloudStatus('kapali');
         return cloudPublicStatus({ configured: false });
       }
-      if (!cloudConfig.gistId) {
-        const pushed = await nativeMessage({ action: 'sync-push-disk' });
-        if (!pushed || !pushed.success) throw new Error((pushed && pushed.error) || 'Gist olusturulamadi.');
-        cloudConfig.gistId = pushed.gistId || '';
-        cloudConfig.fileName = pushed.fileName || GIST_FILE_NAME;
-        cloudConfig.diskCount = pushed.diskCount || cloudConfig.diskCount || 0;
-      }
 
       setCloudStatus('senkron');
-      let local = await _rawNotes();
-      let remote = await fetchCloudNotes();
+      const local = await _rawNotes();
 
-      // Extension reinstall sonrasi chrome.storage bos olabilir. Gist de bos ise
-      // ama PC arsivinde not varsa, buyuk dosyayi native host dogrudan Gist'e iter.
-      if (local.length === 0 && remote.length === 0 && cloudConfig.diskCount > 0) {
-        const pushed = await nativeMessage({ action: 'sync-push-disk' });
-        if (!pushed || !pushed.success) throw new Error((pushed && pushed.error) || 'Disk arsivi Gist e yuklenemedi.');
-        cloudConfig.gistId = pushed.gistId || cloudConfig.gistId;
-        cloudConfig.fileName = pushed.fileName || cloudConfig.fileName || GIST_FILE_NAME;
-        cloudConfig.diskCount = pushed.diskCount || cloudConfig.diskCount;
-        remote = await fetchCloudNotes();
-      }
+      // TEK gidis-donus: sunucu gelen listeyi depodakiyle birlestirip
+      // birlesmis listeyi doner → ayrica "cek" gerekmez.
+      //
+      // Uzanti yeniden kurulunca chrome.storage BOS olur ve buraya bos liste
+      // gelir. Bu ARTIK ZARARSIZ: sunucu birlestirdigi icin hicbir sey
+      // silinmez, aksine tum arsiv geri iner. (Eski Gist yolunda ayni durum
+      // tehlikeliydi; onun icin native host'la disk arsivini dogrudan Gist'e
+      // iten ozel bir kurtarma yolu vardi — artik gereksiz, kaldirildi.)
+      const uzak = await pushCloudNotes(local);
+      const merged = _mergeById(local, uzak || []);
+      const degisti = _sig(merged) !== _sig(local);
+      if (degisti) await saveMergedNotes(merged);
 
-      const merged = _mergeById(local, remote);
-      if (_sig(merged) !== _sig(local)) {
-        await saveMergedNotes(merged);
-      }
-      await pushCloudNotes(merged);
       setCloudStatus('tamam');
-      return cloudPublicStatus({ changed: _sig(merged) !== _sig(local), reason });
+      return cloudPublicStatus({ changed: degisti, reason });
     } catch (err) {
       setCloudStatus('hata', err.message);
       return cloudPublicStatus({ success: false, error: err.message, reason });
@@ -722,8 +714,8 @@ async function cloudFullSync({ reason = 'auto' } = {}) {
 function scheduleCloudPush() {
   clearTimeout(cloudPushTimeout);
   cloudPushTimeout = setTimeout(() => {
-    loadNativeSyncConfig().then((cfg) => {
-      if (cfg && cfg.token && cfg.gistId) cloudFullSync({ reason: 'local-change' });
+    sunucuAyariniYukle().then((cfg) => {
+      if (cfg && cfg.sunucuUrl) cloudFullSync({ reason: 'local-change' });
     }).catch(() => {});
   }, 2500);
 }
@@ -737,8 +729,8 @@ function ensureCloudAlarm() {
 function initCloudSync() {
   if (cloudInitPromise) return cloudInitPromise;
   cloudInitPromise = (async () => {
-    const cfg = await loadNativeSyncConfig(true);
-    if (cfg && cfg.token) {
+    const cfg = await sunucuAyariniYukle(true);
+    if (cfg && cfg.sunucuUrl) {
       ensureCloudAlarm();
       return cloudFullSync({ reason: 'startup' });
     }
