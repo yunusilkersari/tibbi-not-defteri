@@ -21,3 +21,6 @@ desktop/runtime/
 # Derleme çıktıları (paketlenmiş sürümler) ve yerel dev dosyaları
 dist/
 .claude/launch.json
+
+# Claude Code kisisel ayarlari (makineye ozel, paylasilmaz)
+.claude/settings.local.json

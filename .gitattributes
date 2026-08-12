@@ -1,0 +1,5 @@
+# Satir sonlarini LF'te SABITLE.
+# 2026-08-12: dosyalar Windows tarafinda CRLF'e donmus, depo LF'ti -> 13 dosyada
+# 3.234 eklenti / 3.245 silme goruldu ama GERCEK degisiklik 7 dosya / 213 satirdi.
+# Yani diff'in %94'u gurultuydu; boyle bir commit git blame'i kullanilamaz kilar.
+* text=auto eol=lf

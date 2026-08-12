@@ -110,6 +110,30 @@ const NotStorage = {
             return;
           }
 
+          // Kısmi/bozuk içe aktarma sessiz veri kaybına yol açmasın. Tüm dosya
+          // geçerli değilse hiçbir notu aktarma; kullanıcı önce dosyayı düzeltsin.
+          const ids = new Set();
+          const invalidIndex = notes.findIndex((note) => {
+            if (!note || typeof note !== 'object' || Array.isArray(note)) return true;
+            if (typeof note.id !== 'string' || !note.id.trim() || ids.has(note.id)) return true;
+            ids.add(note.id);
+            const invalidDates = typeof note.createdAt !== 'string' ||
+              !Number.isFinite(Date.parse(note.createdAt)) ||
+              typeof note.updatedAt !== 'string' ||
+              !Number.isFinite(Date.parse(note.updatedAt));
+            if (invalidDates) return true;
+            if (note.deleted === true) {
+              return false;
+            }
+            return typeof note.content !== 'string' ||
+              (note.contentHtml != null && typeof note.contentHtml !== 'string') ||
+              (note.tags != null && (!Array.isArray(note.tags) || note.tags.some(tag => typeof tag !== 'string')));
+          });
+          if (invalidIndex !== -1) {
+            reject(new Error(`Geçersiz veya yinelenen not kaydı (sıra: ${invalidIndex + 1})`));
+            return;
+          }
+
           chrome.runtime.sendMessage({ action: 'import-notes', data: notes }, (response) => {
             if (response && response.success) {
               resolve(notes.length);
